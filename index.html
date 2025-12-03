@@ -1,0 +1,1568 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Definición de Tasas y Tarifas Farmacéuticas ESE HUHMP</title>
+    <!-- Carga de Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Configuración de Tailwind para usar un font moderno y Font Awesome para iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Carga de Chart.js para gráficos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    
+    <!-- LIBRERÍAS PARA PDF (jsPDF y AutoTable) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <!-- LIBRERÍAS ADICIONALES para manejar archivos CSV/Excel -->
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f4f7f9;
+        }
+
+        /* Colores Institucionales */
+        .color-principal { background-color: #312782; }
+        .color-secundario { background-color: #008041; }
+        .text-secundario { color: #008041; }
+        .color-terciario { background-color: #EC268F; }
+        .text-terciario { color: #EC268F; }
+        .border-secundario { border-color: #008041; }
+        .border-principal { border-color: #312782; }
+
+        .table-header {
+            background-color: #312782; /* Azul principal */
+            color: white;
+        }
+        .regulated {
+            background-color: #fef2f2; /* Rojo suave para regulados */
+            border-left: 4px solid #ef4444;
+        }
+        .non-regulated {
+            background-color: #f0fdf4; /* Verde suave para no regulados */
+            border-left: 4px solid #008041; 
+        }
+        .card-group {
+            transition: all 0.3s ease;
+        }
+        .card-group:hover {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .collapsed {
+            display: none;
+        }
+        .table-row-hidden {
+            display: none;
+        }
+        .tab-button {
+            padding: 0.75rem 1rem;
+            border-bottom: 2px solid transparent;
+            color: #6b7280; /* text-gray-500 */
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+            margin-bottom: 0.5rem; 
+        }
+        .tab-button:hover {
+            color: #EC268F; /* Fucsia terciario en hover */
+        }
+        /* La clase 'active' usará el color terciario para resaltar */
+        .tab-button.active {
+            border-color: #EC268F; /* Fucsia de activación */
+            color: #312782; /* Azul oscuro del texto activo */
+            font-weight: 600;
+            background-color: #fce8f4; /* Fondo suave del terciario */
+        }
+        
+        /* Ajuste para forzar la envoltura de las pestañas en múltiples filas */
+        .tab-menu-container {
+            display: flex;
+            flex-wrap: wrap; 
+            gap: 0.5rem 1rem; 
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 0.5rem;
+        }
+        /* Estilo para los encabezados de sección anclados */
+        .section-anchor {
+            padding-top: 5rem; 
+            margin-top: -5rem;
+            visibility: hidden;
+            pointer-events: none;
+        }
+        
+        /* Estilos para inputs en tablas editables */
+        .table-input {
+            width: 100%;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            padding: 0.25rem 0.5rem;
+            font-size: 0.875rem;
+            transition: border-color 0.15s ease-in-out;
+        }
+        .table-input:focus {
+            outline: none;
+            border-color: #EC268F;
+            box-shadow: 0 0 0 2px rgba(236, 38, 143, 0.2);
+        }
+
+        /* Estilo para Placeholder vacío */
+        .table-input::placeholder {
+            color: #9ca3af; /* text-gray-400 */
+            opacity: 1; 
+        }
+        
+        /* Estilo para Select en tablas editables */
+        .table-select {
+            width: 100%;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            padding: 0.25rem 0.5rem;
+            font-size: 0.875rem;
+            transition: border-color 0.15s ease-in-out;
+            appearance: none; /* Quita el estilo nativo en algunos navegadores */
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='currentColor'%3e%3cpath fill-rule='evenodd' d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z' clip-rule='evenodd' /%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 0.5rem center;
+            background-size: 1em;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <!-- Encabezado Principal con Logo Institucional -->
+        <header class="mb-8 p-6 color-principal rounded-xl shadow-lg border-t-4 border-secundario">
+            <div class="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0 md:space-x-6">
+                <!-- Parte Izquierda: Logo y Título -->
+                <div class="flex items-center space-x-6 w-full md:w-auto">
+                    <!-- Contenedor del Logo -->
+                    <div class="flex-shrink-0">
+                        <img id="logo-img" src="Logo_HUHMP_Blanco.png" alt="Logo ESE HUHMP" class="h-10 sm:h-12 w-auto">
+                    </div>
+                    
+                    <!-- Contenedor del Título -->
+                    <div class="flex-grow min-w-0">
+                        <h1 class="text-xl sm:text-3xl font-extrabold text-white mb-1 truncate">Modelo de Tarifas Farmacéuticas ESE HUHMP</h1>
+                        <p class="text-sm sm:text-base text-gray-200 truncate">GD-SGI-M-005: Determinación de Tasas y Tarifas de Venta para el listado 2026.</p>
+                    </div>
+                </div>
+
+                <!-- Parte Derecha: Botón Descargar PDF -->
+                <div class="flex-shrink-0">
+                    <button onclick="generatePDF()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-150 flex items-center">
+                        <i class="fas fa-file-pdf mr-2"></i> Descargar PDF
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navegación por Pestañas (Tabs) - Se usa como ancla de scroll -->
+        <nav class="bg-white p-4 rounded-t-xl shadow-md sticky top-0 z-10">
+            <div class="tab-menu-container">
+                <!-- Secciones en orden numérico romano. El onclick ahora maneja el scroll. -->
+                <button class="tab-button" onclick="scrollToSection('section-I', this)" data-section="section-I">I. Resumen de los productos por tipo</button>
+                <button class="tab-button" onclick="scrollToSection('section-II', this)" data-section="section-II">II. Gráficos Interactivos de Pareto</button>
+                <button class="tab-button" onclick="scrollToSection('section-III', this)" data-section="section-III">III. Información de Costos</button>
+                <button class="tab-button" onclick="scrollToSection('section-IV', this)" data-section="section-IV">IV. Tarifas de Venta y Gráficos</button>
+                <button class="tab-button" onclick="scrollToSection('section-V', this)" data-section="section-V">V. Estado de Resultados (E.R)</button>
+                <button class="tab-button" onclick="scrollToSection('section-VI', this)" data-section="section-VI">VI. Detalle y Propuesta de Tarifa</button>
+                <button class="tab-button" onclick="scrollToSection('section-VII', this)" data-section="section-VII">VII. Legalización y Aprobación</button>
+            </div>
+        </nav>
+
+        <!-- Contenido Principal de Secciones (Ahora todas visibles) -->
+        <div class="bg-white p-6 rounded-b-xl shadow-lg mb-8 space-y-12">
+            
+            <!-- SECCIÓN I: Resumen de los productos por tipo (Tarjetas) -->
+            <section id="section-I">
+                <div class="section-anchor" id="anchor-section-I"></div>
+                <h2 class="text-2xl font-bold text-gray-700 mb-6 border-b pb-3 border-gray-200">I. Resumen de los productos por tipo</h2>
+                <div id="summary" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+                    <!-- Cards se renderizarán aquí -->
+                </div>
+            </section>
+
+            <!-- SECCIÓN II: Gráficos Interactivos de Pareto -->
+            <section id="section-II">
+                <div class="section-anchor" id="anchor-section-II"></div>
+                <h2 class="text-2xl font-bold text-gray-700 mb-6 border-b pb-3 border-gray-200">II. Gráficos Interactivos de Pareto (Clasificación ABC/A+)</h2>
+                <p class="text-gray-600 mb-4">Análisis de la rotación y valor de inventario según la Clasificación Pareto (ABC) y la Identificación A+ para la toma de decisiones financieras. **Nota:** Los gráficos se renderizan al llegar a la sección si hay scroll, o al hacer clic en el menú.</p>
+                <div class="p-4 border rounded-lg shadow-inner bg-gray-50 max-w-2xl mx-auto bg-white">
+                    <canvas id="paretoChart"></canvas>
+                </div>
+            </section>
+
+            <!-- SECCIÓN III: Información de Costos (REESTRUCTURADA) -->
+            <section id="section-III">
+                <div class="section-anchor" id="anchor-section-III"></div>
+                <h2 class="text-2xl font-bold text-gray-700 mb-6 border-b pb-3 border-gray-200">III. Estructura de Costos y Base Tarifaria 2026</h2>
+                
+                <p class="text-gray-600 mb-4">La correcta imputación de costos (Compra, Logísticos, Operacionales) es el factor principal para definir la Tarifa de Venta 2026. Los costos indirectos se aplican como un porcentaje sobre el Precio Máximo de Compra (PMC).</p>
+                
+                <!-- CUADRO DE CARGA DE ARCHIVOS -->
+                <div class="mb-6 flex flex-col sm:flex-row gap-4 items-start sm:items-center p-3 border border-dashed rounded-lg bg-gray-50">
+                    <button onclick="document.getElementById('file-upload').click()" class="bg-color-terciario hover:bg-pink-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-150 flex items-center">
+                        <i class="fas fa-upload mr-2"></i> Cargar Archivo de Costos (ERP - CSV/Excel)
+                    </button>
+                    <input type="file" id="file-upload" accept=".csv, .xlsx, .xls" class="hidden" onchange="handleFileUpload(event)">
+                    <span id="file-status" class="text-sm text-gray-600 italic">No se ha cargado ningún archivo.</span>
+                </div>
+
+                <!-- NUEVA TABLA DE DEFINICIÓN DE PORCENTAJES DE COSTO INDIRECTO -->
+                <div id="cost-percentage-detail" class="mb-8 border rounded-xl shadow-md overflow-hidden border-secundario/50">
+                    <div class="color-secundario text-white p-3">
+                        <h3 class="text-lg font-bold">Definición de Porcentajes de Costo Indirecto (GD-SGI-M-005)</h3>
+                        <p class="text-sm font-light text-gray-100">Ingrese el porcentaje de participación del costo sobre el Precio Máximo de Compra (PMC). La suma total de costos indirectos se reflejará en el Costo Total Unitario.</p>
+                    </div>
+                    <div class="p-4 overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200 border border-gray-100 rounded-lg">
+                            <thead class="bg-gray-100">
+                                <tr>
+                                    <th class="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider">Rubro de Costo</th>
+                                    <th class="px-3 py-3 text-right text-xs font-medium uppercase tracking-wider">Porcentaje Aplicable (%)</th>
+                                    <th class="px-3 py-3 text-right text-xs font-medium uppercase tracking-wider">Monto Calculado Total (Referencia)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200" id="cost-percentage-body">
+                                <!-- Filas se cargan con JS -->
+                            </tbody>
+                            <tfoot class="bg-gray-50">
+                                <tr>
+                                    <td class="px-3 py-2 text-sm font-bold text-gray-800">TOTAL COSTOS INDIRECTOS</td>
+                                    <td class="px-3 py-2 text-sm font-bold text-right text-secundario" id="total-percentage">0.00%</td>
+                                    <td class="px-3 py-2 text-sm font-bold text-right text-principal" id="total-indirect-cost">$ 0.00</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+                <!-- FIN NUEVA TABLA DE COSTOS INDIRECTOS -->
+
+                <!-- TABLA DE CONSOLIDADO DE COSTOS (IMAGEN 1 - ABAJO) -->
+                <div id="cost-summary-container" class="border rounded-xl shadow-md overflow-hidden border-principal/50">
+                    <div class="color-principal text-white p-3">
+                        <h3 class="text-lg font-bold">Consolidado de Costos por Grupo (2025)</h3>
+                        <p class="text-sm font-light text-gray-200">Costo Máximo de Compra vs. Costo Total (Aplicando los % Indirectos definidos arriba).</p>
+                    </div>
+                    <div class="p-4 overflow-x-auto" id="cost-summary-table">
+                        <!-- Tabla de costos consolidados por grupo -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECCIÓN IV: Tarifas de Venta y Gráficos -->
+            <section id="section-IV">
+                <div class="section-anchor" id="anchor-section-IV"></div>
+                <h2 class="text-2xl font-bold text-gray-700 mb-6 border-b pb-3 border-gray-200">IV. Tarifas de Venta y Gráficos</h2>
+                <p class="text-gray-600 mb-4">Análisis de dispersión de la Tarifa de Venta Actual (2025) vs. Costo Máximo de Compra (2025).</p>
+                <div class="p-4 border rounded-lg shadow-inner bg-gray-50 max-w-3xl mx-auto bg-white">
+                    <canvas id="scatterChart"></canvas>
+                </div>
+            </section>
+
+            <!-- SECCIÓN V: Estado de Resultados (E.R) (CUADRO INTERACTIVO) -->
+            <section id="section-V">
+                <div class="section-anchor" id="anchor-section-V"></div>
+                <h2 class="text-2xl font-bold text-gray-700 mb-6 border-b pb-3 border-gray-200">V. Estado de Resultados (E.R) Proyectado</h2>
+                <div id="er-summary-container" class="border rounded-xl shadow-md overflow-hidden border-principal/50">
+                    <div class="color-principal text-white p-3">
+                        <h3 class="text-lg font-bold">Estimación de Margen Bruto y Utilidad Operacional</h3>
+                        <p class="text-sm font-light text-gray-200">Proyección financiera por grupo de productos. (Valores simulados)</p>
+                    </div>
+                    <div class="p-4 overflow-x-auto" id="er-summary-table">
+                        <!-- Tabla de E.R. simulada por grupo -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECCIÓN VI: Tablas Detalle y Propuesta de Tarifa (Múltiples CUADROS INTERACTIVOS) -->
+            <section id="section-VI">
+                <div class="section-anchor" id="anchor-section-VI"></div>
+                <h2 class="text-2xl font-bold text-gray-700 mb-6 border-b pb-3 border-gray-200">VI. Tablas Detalle de Productos y Propuesta de Tarifa</h2>
+                <div id="product-groups" class="space-y-8">
+                    <!-- Los grupos con tablas colapsables se cargarán aquí como cuadros interactivos -->
+                </div>
+            </section>
+
+            <!-- SECCIÓN VII: Legalización y Aprobación del Tarifario -->
+            <section id="section-VII">
+                <div class="section-anchor" id="anchor-section-VII"></div>
+                <h2 class="text-2xl font-bold text-gray-700 mb-6 border-b pb-3 border-gray-200">VII. Legalización y Aprobación del Tarifario</h2>
+                <p class="text-gray-600 mb-4">Ingrese los responsables de la elaboración, revisión y aprobación del presente tarifario. Utilice los botones para añadir o eliminar participantes. Estos datos se reflejarán en el documento PDF generado.</p>
+                
+                <div class="mb-4 flex space-x-2">
+                    <button onclick="addSignatureRow()" class="bg-secundario hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-150 flex items-center">
+                        <i class="fas fa-plus mr-2"></i> Añadir Participante
+                    </button>
+                </div>
+
+                <div class="border rounded-xl shadow-md overflow-hidden border-principal/50">
+                    <!-- Encabezado del Cuadro -->
+                    <div class="color-principal text-white p-3">
+                        <h3 class="text-lg font-bold">Registro de Firmas y Responsabilidades</h3>
+                        <p class="text-sm font-light text-gray-200">Validación del Modelo para la Estructuración de Listado Institucional (GD-SGI-M-005)</p>
+                    </div>
+                    <!-- Contenido del Cuadro -->
+                    <div class="p-4 overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200 border border-gray-100 rounded-lg">
+                            <thead class="table-header">
+                                <tr>
+                                    <th class="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider rounded-tl-lg" style="width: 20%">Rol</th>
+                                    <th class="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider" style="width: 30%">Nombre y Apellidos</th>
+                                    <th class="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider" style="width: 25%">Cargo</th>
+                                    <th class="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider" style="width: 20%">Área</th>
+                                    <th class="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider rounded-tr-lg" style="width: 5%">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200" id="signatures-body">
+                                <!-- Las filas se generarán con JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </div>
+
+    <!-- Scripts y Lógica de la Aplicación -->
+    <script>
+        // Definición de la estructura de costos indirectos y sus porcentajes iniciales
+        let costStructure = [
+            { name: "Mano de Obra", percentage: 5.0, key: 'mo' },
+            { name: "Dispensación", percentage: 3.0, key: 'disp' },
+            { name: "Consumo", percentage: 2.0, key: 'cons' },
+            { name: "Activos Fijos", percentage: 1.5, key: 'af' },
+            { name: "Gastos Generales", percentage: 1.0, key: 'gg' },
+            { name: "Logísticos", percentage: 2.0, key: 'log' },
+            { name: "Administrativos", percentage: 1.5, key: 'adm' },
+        ];
+
+
+        // Data del usuario proporcionada (costos y revenues serán recalculados)
+        let productData = [
+            {
+                name: "LISTADO GRAL MEDICAMENTOS",
+                totalItems: 621,
+                regulated: false,
+                color: 'green',
+                totalCost: 0,
+                totalRevenue: 0,
+            },
+            {
+                name: "MEDICAMENTOS REGULADOS",
+                totalItems: 572,
+                regulated: true,
+                color: 'red',
+                totalCost: 0,
+                totalRevenue: 0,
+            },
+            {
+                name: "STENT REGULADOS",
+                totalItems: 325,
+                regulated: true,
+                color: 'red',
+                totalCost: 0,
+                totalRevenue: 0,
+            },
+            {
+                name: "DISPOSITIVOS MÉDICOS",
+                totalItems: 1855,
+                regulated: false,
+                color: 'green',
+                totalCost: 0,
+                totalRevenue: 0,
+            },
+            {
+                name: "PRODUCTOS NO FACTURABLES",
+                totalItems: 10,
+                regulated: false,
+                color: 'gray',
+                totalCost: 0,
+                totalRevenue: 0,
+            },
+        ];
+        
+        // Roles predefinidos para la sección VII
+        const signatureRoles = [
+            "ELABORÓ",
+            "REVISÓ",
+            "APROBÓ",
+            "PROYECTO Y REVISO",
+            "SUBGERENTE FINANCIERO",
+            "SUBGERENTE TÉCNICO CIENTÍFICO",
+            "OTROS"
+        ];
+
+        // Estado inicial de firmas
+        let signatures = [
+            { id: 0, role: "PROYECTO Y REVISO", name: "", cargo: "", area: "" },
+            { id: 1, role: "REVISÓ", name: "", cargo: "", area: "" },
+            { id: 2, role: "APROBÓ", name: "", cargo: "", area: "" },
+            { id: 3, role: "APROBÓ", name: "", cargo: "", area: "" },
+        ];
+        let nextSignatureId = signatures.length;
+
+
+        // Función para formatear a moneda colombiana
+        const formatCurrency = (amount) => {
+            if (typeof amount !== 'number') amount = parseFloat(amount) || 0;
+            return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 2 }).format(amount);
+        };
+        
+        // Función principal para calcular el costo total de un producto
+        const calculateTotalCost = (baseCost) => {
+            const totalIndirectPercentage = costStructure.reduce((sum, item) => sum + item.percentage, 0);
+            return baseCost * (1 + totalIndirectPercentage / 100);
+        };
+
+        // Función para generar la data mockup de un producto (simulando datos del ERP)
+        const generateMockProduct = (groupName, id) => {
+            const isRegulated = groupName.includes("REGULADOS") || groupName.includes("STENT");
+            
+            const baseCost = isRegulated 
+                ? (Math.random() * 100000 + 1000)
+                : (Math.random() * 500000 + 5000);
+            
+            // Calculamos el costo total usando la estructura de costos definida
+            const costoTotal = calculateTotalCost(baseCost);
+            
+            // Tarifa de venta: Margen 10% para regulados, 30-60% para no regulados
+            const defaultMargin = isRegulated ? 1.10 : (1 + (Math.random() * 0.3 + 0.3));
+            const tarifaVentaActual = costoTotal * defaultMargin;
+
+            // Simulación de clasificación Pareto
+            const paretoClasses = isRegulated ? ['R', 'R+'] : ['A+', 'A', 'B', 'C'];
+            const paretoClass = paretoClasses[Math.floor(Math.random() * paretoClasses.length)];
+
+            return {
+                id: `${groupName.charAt(0)}${id.toString().padStart(4, '0')}`,
+                description: `${groupName.split(' ')[0]} - Item ${id}`,
+                existingUnits: Math.floor(Math.random() * 1000) + 1,
+                costoMaximo: baseCost,
+                costoTotal: costoTotal,
+                clasificacionPareto: paretoClass,
+                tarifaVentaActual: tarifaVentaActual,
+                regulated: isRegulated,
+                unitsSold: Math.floor(Math.random() * 500) + 1
+            };
+        };
+
+        // Asignar productos mock a la data principal y calcular totales
+        const generateInitialMockData = () => {
+            productData.forEach(group => {
+                const numProducts = 5; // Usamos 5 mocks por grupo para el ejemplo
+                group.products = Array.from({ length: numProducts }, (_, i) => generateMockProduct(group.name, i + 1));
+                
+                // Recalcular Totales
+                group.totalCost = group.products.reduce((sum, p) => sum + p.costoTotal, 0);
+                group.totalRevenue = group.products.reduce((sum, p) => sum + (p.tarifaVentaActual * p.unitsSold), 0);
+            });
+        };
+        
+        // ---------------------------------------------------
+        // Lógica de Costos Indirectos (Sección III - Nueva Tabla)
+        // ---------------------------------------------------
+
+        const updateCostStructureState = (key, value) => {
+            const index = costStructure.findIndex(item => item.key === key);
+            if (index !== -1) {
+                // Asegurar que el valor sea numérico
+                const percentage = parseFloat(value);
+                costStructure[index].percentage = isNaN(percentage) ? 0 : percentage;
+                
+                // Recalcular todo el modelo tras el cambio
+                recalculateModel();
+            }
+        };
+
+        // Función para recalcular todo el modelo (costos, revenues, resúmenes)
+        const recalculateModel = () => {
+            let totalMaxCostGlobal = 0;
+            
+            // 1. Recorrer todos los productos para actualizar Costo Total y métricas de grupo
+            productData.forEach(group => {
+                group.totalCost = 0;
+                group.totalRevenue = 0;
+
+                group.products.forEach(p => {
+                    // Recalcular Costo Total usando el Precio Máximo de Compra (Costo Máximo)
+                    p.costoTotal = calculateTotalCost(p.costoMaximo);
+                    
+                    // Asegurar que la tarifa de venta no se altere inmediatamente, pero que se pueda proponer una nueva
+                    
+                    // Sumar a los totales del grupo
+                    group.totalCost += p.costoTotal;
+                    group.totalRevenue += (p.tarifaVentaActual * p.unitsSold); 
+                });
+                
+                totalMaxCostGlobal += group.products.reduce((sum, p) => sum + p.costoMaximo, 0);
+            });
+            
+            // 2. Renderizar los costos indirectos
+            renderCostPercentageDetail(totalMaxCostGlobal);
+            
+            // 3. Renderizar las tablas afectadas
+            renderSummaryCards();
+            renderCostSummary();
+            renderERSummary();
+            renderGroupDetails();
+            // Los gráficos (II y IV) deberían re-renderizarse si sus datos dependen de esta estructura (aunque el mock no los actualiza realmente con la data de archivo).
+            renderScatterChart(); 
+        };
+
+
+        const renderCostPercentageDetail = (totalMaxCostGlobal = 0) => {
+            const body = document.getElementById('cost-percentage-body');
+            let html = '';
+            let totalPercentage = 0;
+            let totalIndirectCost = 0;
+
+            costStructure.forEach(item => {
+                totalPercentage += item.percentage;
+                
+                // Cálculo del monto total (para referencia, no para ser editable)
+                const itemCost = totalMaxCostGlobal * (item.percentage / 100);
+                totalIndirectCost += itemCost;
+                
+                html += `
+                    <tr>
+                        <td class="px-3 py-2 text-sm font-medium text-gray-900">${item.name}</td>
+                        <td class="px-3 py-2 whitespace-nowrap text-right">
+                            <input type="number" id="cost-percent-${item.key}" class="w-20 text-right table-input" 
+                                value="${item.percentage.toFixed(2)}" step="0.1" min="0" max="100"
+                                oninput="updateCostStructureState('${item.key}', this.value)">
+                            <span class="text-sm font-bold">%</span>
+                        </td>
+                        <td class="px-3 py-2 whitespace-nowrap text-sm text-right text-gray-700">${formatCurrency(itemCost)}</td>
+                    </tr>
+                `;
+            });
+
+            body.innerHTML = html;
+            document.getElementById('total-percentage').textContent = `${totalPercentage.toFixed(2)}%`;
+            document.getElementById('total-indirect-cost').textContent = formatCurrency(totalIndirectCost);
+        };
+
+
+        // ---------------------------------------------------
+        // Lógica de Carga de Archivos (Sección III)
+        // ---------------------------------------------------
+
+        window.handleFileUpload = (event) => {
+            const file = event.target.files[0];
+            const statusSpan = document.getElementById('file-status');
+            if (!file) {
+                statusSpan.textContent = "No se ha cargado ningún archivo.";
+                return;
+            }
+
+            statusSpan.textContent = `Cargando ${file.name}...`;
+
+            Papa.parse(file, {
+                header: true,
+                dynamicTyping: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    if (results.data.length === 0) {
+                        statusSpan.textContent = `Error: El archivo ${file.name} está vacío o no es compatible.`;
+                        return;
+                    }
+                    
+                    const headers = results.meta.fields || [];
+                    const requiredHeaders = ['ID_Producto', 'Costo_Maximo', 'Grupo'];
+                    const isValid = requiredHeaders.every(header => headers.includes(header));
+                    
+                    if (!isValid) {
+                        statusSpan.textContent = `Error: El archivo ${file.name} no contiene las columnas requeridas (${requiredHeaders.join(', ')}).`;
+                        return;
+                    }
+                    
+                    // 1. Actualizar productData con los datos del archivo
+                    updateProductDataFromCSV(results.data);
+                    
+                    // 2. Recalcular todo el modelo (aplicará los % de costos indirectos a los nuevos Costo_Maximo)
+                    recalculateModel();
+                    
+                    statusSpan.textContent = `¡Datos de costos actualizados exitosamente desde ${file.name}!`;
+                    showFeedback(`Se cargaron ${results.data.length} registros. Revise las Secciones III, V y VI.`, 'success');
+
+                },
+                error: function(error) {
+                    statusSpan.textContent = `Error al procesar el archivo: ${error.message}`;
+                    showFeedback(`Error al procesar el archivo: ${error.message}`, 'error');
+                }
+            });
+        };
+
+        const updateProductDataFromCSV = (data) => {
+            const newProductDataMap = {};
+            const groupNames = productData.map(g => g.name);
+
+            data.forEach(row => {
+                const groupName = row.Grupo || 'OTROS';
+                const productId = row.ID_Producto;
+                
+                if (!productId) return; 
+
+                const costoMaximo = parseFloat(row.Costo_Maximo) || 0;
+                const tarifaVentaActual = parseFloat(row.Tarifa_Actual) || costoMaximo * 1.3;
+                const unitsSold = parseInt(row.Unidades_Facturadas) || 1;
+                const clasifPareto = row.Clasif_Pareto || 'C';
+
+                // Determinar si es regulado basado en el nombre del grupo
+                const isRegulated = groupName.toUpperCase().includes("REGULADO") || groupName.toUpperCase().includes("STENT");
+
+
+                if (!newProductDataMap[groupName]) {
+                    newProductDataMap[groupName] = {
+                        name: groupName,
+                        totalItems: 0,
+                        regulated: isRegulated,
+                        color: isRegulated ? 'red' : 'green',
+                        totalCost: 0,
+                        totalRevenue: 0,
+                        products: []
+                    };
+                }
+
+                const group = newProductDataMap[groupName];
+                
+                group.totalItems += 1;
+                
+                // Los campos totalCost y totalRevenue se calcularán en recalculateModel()
+                
+                group.products.push({
+                    id: productId,
+                    description: row.Descripcion || `Producto ${productId}`,
+                    existingUnits: row.Existencias || unitsSold,
+                    costoMaximo: costoMaximo, // PMC (Base para costos indirectos)
+                    costoTotal: 0, // Se calcula en recalculateModel
+                    clasificacionPareto: clasifPareto,
+                    tarifaVentaActual: tarifaVentaActual,
+                    regulated: isRegulated,
+                    unitsSold: unitsSold
+                });
+            });
+
+            // Reemplazar la data principal con la nueva data (manteniendo el orden si es posible)
+            productData = Object.values(newProductDataMap).sort((a, b) => {
+                return groupNames.indexOf(a.name) - groupNames.indexOf(b.name);
+            });
+        };
+
+
+        // ---------------------------------------------------
+        // Lógica de Firmas Dinámicas (Sección VII)
+        // ---------------------------------------------------
+        
+        const generateRoleOptions = (selectedRole) => {
+            return signatureRoles.map(role => 
+                `<option value="${role}" ${role === selectedRole ? 'selected' : ''}>${role}</option>`
+            ).join('');
+        };
+
+        const renderSignaturesTable = () => {
+            const tbody = document.getElementById('signatures-body');
+            tbody.innerHTML = signatures.map(sig => `
+                <tr id="row-sign-${sig.id}">
+                    <td class="px-3 py-2 text-sm font-bold text-gray-900">
+                        <select id="sign-role-${sig.id}" class="table-select" onchange="updateSignatureState(${sig.id}, 'role', this.value)">
+                            ${generateRoleOptions(sig.role)}
+                        </select>
+                    </td>
+                    <td class="px-3 py-2">
+                        <input type="text" id="sign-name-${sig.id}" class="table-input" 
+                            placeholder="Nombre completo" value="${sig.name}" 
+                            oninput="updateSignatureState(${sig.id}, 'name', this.value)">
+                    </td>
+                    <td class="px-3 py-2">
+                        <input type="text" id="sign-cargo-${sig.id}" class="table-input" 
+                            placeholder="Cargo" value="${sig.cargo}" 
+                            oninput="updateSignatureState(${sig.id}, 'cargo', this.value)">
+                    </td>
+                    <td class="px-3 py-2">
+                        <input type="text" id="sign-area-${sig.id}" class="table-input" 
+                            placeholder="Área o dependencia" value="${sig.area}" 
+                            oninput="updateSignatureState(${sig.id}, 'area', this.value)">
+                    </td>
+                    <td class="px-3 py-2 text-center">
+                        <button onclick="removeSignatureRow(${sig.id})" class="text-red-500 hover:text-red-700 transition duration-150 p-1" title="Eliminar participante">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        };
+        
+        window.addSignatureRow = () => {
+            const newSignature = {
+                id: nextSignatureId++,
+                role: "OTROS",
+                name: "",
+                cargo: "",
+                area: ""
+            };
+            signatures.push(newSignature);
+            renderSignaturesTable();
+            showFeedback('Nuevo participante añadido.', 'success');
+        };
+
+        window.removeSignatureRow = (id) => {
+            // Usamos un modal simulado para la confirmación
+            if (!confirm("¿Está seguro de que desea eliminar este participante de la lista de aprobación?")) {
+                return;
+            }
+            signatures = signatures.filter(sig => sig.id !== id);
+            renderSignaturesTable();
+            showFeedback('Participante eliminado.', 'success');
+        };
+
+        window.updateSignatureState = (id, key, value) => {
+            const index = signatures.findIndex(sig => sig.id === id);
+            if (index !== -1) {
+                signatures[index][key] = value;
+            }
+            // No re-renderiza para evitar perder el foco del input, solo actualiza el estado
+        };
+
+
+        // ---------------------------------------------------
+        // Lógica de Generación de PDF
+        // ---------------------------------------------------
+        
+        async function generatePDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4');
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            const margin = 14;
+            const primaryColor = [49, 39, 130]; // #312782
+            const secondaryColor = [0, 128, 65]; // #008041
+
+            // Fecha actual
+            const today = new Date().toLocaleDateString('es-CO');
+
+            // --- HEADER (Función reutilizable) ---
+            const drawHeader = (doc, pageNumber) => {
+                // Background Azul
+                doc.setFillColor(...primaryColor);
+                doc.rect(0, 0, pageWidth, 30, 'F');
+                
+                // Logo (Simulado con texto si no carga, pero intentaremos cargar imagen base64)
+                doc.setFillColor(255, 255, 255);
+                doc.rect(margin, 5, 20, 20, 'F');
+                doc.setFontSize(8);
+                doc.setTextColor(0, 0, 0);
+                doc.text("LOGO", margin + 5, 17);
+
+                // Títulos
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(14);
+                doc.setTextColor(255, 255, 255);
+                doc.text("ESE HOSPITAL UNIVERSITARIO", margin + 30, 12);
+                doc.text("HERNANDO MONCALEANO PERDOMO", margin + 30, 18);
+                
+                doc.setFont("helvetica", "normal");
+                doc.setFontSize(10);
+                doc.text("MODELO DE TARIFAS FARMACÉUTICAS (GD-SGI-M-005)", margin + 30, 25);
+
+                // Info derecha
+                doc.setFontSize(8);
+                doc.text(`Fecha: ${today}`, pageWidth - margin - 30, 12);
+                doc.text(`Vigencia: 2026`, pageWidth - margin - 30, 17);
+                doc.text(`Página ${pageNumber}`, pageWidth - margin - 30, 22);
+            };
+
+            // --- Contenido del PDF ---
+            
+            // PÁGINA 1
+            drawHeader(doc, 1);
+            let currentY = 40;
+
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(12);
+            doc.setTextColor(0, 0, 0);
+            doc.text("I. RESUMEN DE PRODUCTOS POR TIPO", margin, currentY);
+            currentY += 5;
+
+            const summaryData = productData.map(g => [
+                g.name, g.products.length, g.totalItems, g.itemsIniciales, g.itemsIncluidos, g.itemsPendientes
+            ]);
+
+            doc.autoTable({
+                startY: currentY,
+                head: [['Grupo', 'Ítems Cargados', 'Total Items', 'Iniciales', 'Incluidos', 'Pendientes']],
+                body: summaryData,
+                headStyles: { fillColor: primaryColor },
+                theme: 'grid'
+            });
+            currentY = doc.lastAutoTable.finalY + 15;
+
+            doc.text("II. GRÁFICO PARETO (Clasificación)", margin, currentY);
+            currentY += 5;
+            const paretoCanvas = document.getElementById('paretoChart');
+            if(paretoCanvas){
+                const paretoImg = paretoCanvas.toDataURL("image/png");
+                doc.addImage(paretoImg, 'PNG', margin, currentY, 180, 80);
+                currentY += 90;
+            }
+
+            // PÁGINA 2
+            doc.addPage();
+            drawHeader(doc, 2);
+            currentY = 40;
+
+            doc.text("III. ESTRUCTURA DE COSTOS Y BASE TARIFARIA", margin, currentY);
+            currentY += 5;
+            
+            // 1. Tabla de Costos Indirectos (Porcentajes)
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(10);
+            doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]); // Verde
+            doc.text("Definición de Porcentajes de Costo Indirecto", margin, currentY);
+            currentY += 5;
+            
+            const totalMaxCostGlobal = productData.flatMap(g => g.products).reduce((sum, p) => sum + p.costoMaximo, 0);
+
+            const indirectCostHead = [['Rubro de Costo', 'Porcentaje Aplicable (%)', 'Monto Calculado Total (Referencia)']];
+            const indirectCostBody = costStructure.map(item => [
+                item.name, 
+                `${item.percentage.toFixed(2)}%`, 
+                formatCurrency(totalMaxCostGlobal * (item.percentage / 100))
+            ]);
+            const totalPercentage = costStructure.reduce((sum, item) => sum + item.percentage, 0);
+            const totalIndirectCost = totalMaxCostGlobal * (totalPercentage / 100);
+
+            doc.autoTable({
+                startY: currentY,
+                head: indirectCostHead,
+                body: indirectCostBody,
+                foot: [['TOTAL COSTOS INDIRECTOS', `${totalPercentage.toFixed(2)}%`, formatCurrency(totalIndirectCost)]],
+                headStyles: { fillColor: secondaryColor, fontSize: 8 },
+                footStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontSize: 9, fontStyle: 'bold' },
+                theme: 'grid',
+                styles: { fontSize: 8 }
+            });
+            currentY = doc.lastAutoTable.finalY + 10;
+            
+            // 2. Tabla Consolidado de Costos (Basada en la data recalculada)
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(12);
+            doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]); // Azul
+            doc.text("Consolidado de Costos por Grupo", margin, currentY);
+            currentY += 5;
+
+
+            const costData = productData.map(g => [
+                g.name, 
+                g.products.length, 
+                formatCurrency(g.products.reduce((s, p)=>s+p.costoMaximo,0)),
+                formatCurrency(g.products.reduce((s, p)=>s+p.costoTotal,0))
+            ]);
+
+            doc.autoTable({
+                startY: currentY,
+                head: [['Grupo', 'Ítems', 'Suma Costo Máximo Compra (2025)', 'Suma Costo Total (Incl. Indirectos)']],
+                body: costData,
+                headStyles: { fillColor: primaryColor },
+                theme: 'grid'
+            });
+            currentY = doc.lastAutoTable.finalY + 15;
+            
+            // 3. Continuar con Secciones IV y V 
+            
+            doc.text("IV. GRÁFICO DISPERSIÓN (Tarifa vs Costo)", margin, currentY);
+            currentY += 5;
+            const scatterCanvas = document.getElementById('scatterChart');
+            if(scatterCanvas){
+                const scatterImg = scatterCanvas.toDataURL("image/png");
+                doc.addImage(scatterImg, 'PNG', margin, currentY, 180, 80);
+                currentY += 90;
+            }
+
+            if (currentY > 250) { doc.addPage(); drawHeader(doc, 3); currentY = 40; } 
+            doc.text("V. ESTADO DE RESULTADOS (Proyección)", margin, currentY);
+            currentY += 5;
+
+            const erData = productData.map(g => {
+                const rev = g.totalRevenue;
+                const cost = g.totalCost;
+                const util = rev - cost;
+                const marg = rev > 0 ? (util/rev)*100 : 0;
+                return [g.name, formatCurrency(rev), formatCurrency(cost), formatCurrency(util), marg.toFixed(2)+'%'];
+            });
+
+            doc.autoTable({
+                startY: currentY,
+                head: [['Grupo', 'Ingresos', 'Costos', 'Utilidad', 'Margen %']],
+                body: erData,
+                headStyles: { fillColor: primaryColor },
+                theme: 'grid'
+            });
+
+            // Páginas Detalle VI (sin cambios)
+            let pageCount = doc.internal.getNumberOfPages();
+            
+            for (let i = 0; i < productData.length; i++) {
+                const group = productData[i];
+                doc.addPage();
+                pageCount++;
+                drawHeader(doc, pageCount);
+                currentY = 40;
+
+                doc.setFontSize(11);
+                doc.text(`VI. DETALLE: ${group.name}`, margin, currentY);
+                
+                const productRows = group.products.map(p => [
+                    p.id, 
+                    p.description.substring(0, 30), 
+                    p.existingUnits, 
+                    formatCurrency(p.costoMaximo), 
+                    p.clasificacionPareto, 
+                    formatCurrency(p.tarifaVentaActual)
+                ]);
+
+                doc.autoTable({
+                    startY: currentY + 5,
+                    head: [['ID', 'Descripción', 'Cant.', 'Costo Max', 'Pareto', 'Tarifa 2025']],
+                    body: productRows,
+                    headStyles: { fillColor: group.regulated ? [239, 68, 68] : secondaryColor }, 
+                    theme: 'striped',
+                    styles: { fontSize: 8 }
+                });
+            }
+
+
+            // --- Página Final: Firmas (Sección VII) ---
+            doc.addPage();
+            pageCount++;
+            drawHeader(doc, pageCount);
+            currentY = 40;
+
+            doc.setFontSize(12);
+            doc.text("VII. LEGALIZACIÓN Y APROBACIÓN DEL TARIFARIO", margin, currentY);
+            currentY += 10;
+
+            // Recopilar datos de los inputs de la Sección VII (del estado global `signatures`)
+            const signBody = signatures.map(sig => [
+                sig.role, 
+                sig.name.toUpperCase() || '_________________________', 
+                sig.cargo.toUpperCase() || '_________________________', 
+                sig.area.toUpperCase() || '_________________________', 
+                '' // Columna para la firma física
+            ]);
+
+            // Tabla de firmas
+            doc.autoTable({
+                startY: currentY,
+                head: [['ROL', 'NOMBRE Y APELLIDOS', 'CARGO', 'AREA', 'FIRMA']],
+                body: signBody,
+                headStyles: { fillColor: primaryColor, halign: 'center' },
+                columnStyles: { 4: { minCellWidth: 30 } }, // Espacio para firma
+                theme: 'grid',
+                styles: { minCellHeight: 15, valign: 'middle' }
+            });
+
+            doc.save('Tarifas_Farmaceuticas_HUHMP_2026.pdf');
+        }
+
+        // ---------------------------------------------------
+        // Pestañas y Navegación (Ahora es solo Scroll)
+        // ---------------------------------------------------
+        
+        window.scrollToSection = (sectionId, button) => {
+            const anchor = document.getElementById(`anchor-${sectionId}`);
+            if (anchor) {
+                anchor.scrollIntoView({ behavior: 'smooth' });
+            }
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            if (button) {
+                button.classList.add('active');
+            }
+        };
+
+        const observerOptions = {
+            root: null,
+            rootMargin: '0px 0px -70% 0px', 
+            threshold: 0.1 
+        };
+
+        // Agregar la sección VII al array de observadores
+        const sections = ['section-I', 'section-II', 'section-III', 'section-IV', 'section-V', 'section-VI', 'section-VII'];
+        
+        const sectionObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                const sectionId = entry.target.id;
+                const button = document.querySelector(`.tab-button[data-section="${sectionId}"]`);
+                
+                if (entry.isIntersecting) {
+                    document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+                    if (button) {
+                        button.classList.add('active');
+                    }
+                }
+            });
+        }, observerOptions);
+
+        // ---------------------------------------------------
+        // Funciones de Renderizado 
+        // ---------------------------------------------------
+
+        const renderSummaryCards = () => {
+            const summaryContainer = document.getElementById('summary');
+            let html = '';
+
+            productData.forEach(group => {
+                const isRegulated = group.regulated;
+                const borderColor = isRegulated ? 'border-red-600' : 'border-secundario'; 
+                const textColor = isRegulated ? 'text-red-600' : 'text-secundario'; 
+                const bgColor = isRegulated ? 'bg-red-50' : 'bg-green-50'; 
+                
+                const margin = group.totalRevenue > 0 ? ((group.totalRevenue - group.totalCost) / group.totalRevenue * 100) : 0;
+                const cost = group.totalCost;
+                const revenue = group.totalRevenue;
+
+                html += `
+                    <div class="card-group ${bgColor} p-4 rounded-xl shadow-md ${borderColor} border-l-4">
+                        <h3 class="text-sm font-semibold uppercase ${textColor} truncate">${group.name}</h3>
+                        <p class="text-3xl font-bold text-gray-800">${group.products.length}</p>
+                        <p class="text-xs text-gray-500 mt-1">Ítems Totales (Cargados)</p>
+                        <div class="mt-2 text-xs text-gray-600 space-y-0.5">
+                            <p>Ingresos: <span class="font-medium">${(revenue / 1000000).toFixed(1)}M</span></p>
+                            <p>Costos: <span class="font-medium">${(cost / 1000000).toFixed(1)}M</span></p>
+                            <p>Margen: <span class="font-medium">${margin.toFixed(1)}%</span></p>
+                        </div>
+                    </div>
+                `;
+            });
+
+            summaryContainer.innerHTML = html;
+        };
+
+        let paretoChartInstance = null;
+        
+        const renderParetoChart = () => {
+            if (paretoChartInstance) {
+                paretoChartInstance.destroy();
+            }
+            const ctx = document.getElementById('paretoChart').getContext('2d');
+            const colors = ['#008041', '#312782', '#6b7280', '#EC268F', '#ef4444'];
+            const labels = ['A (Alto Valor)', 'B (Medio Valor)', 'C (Bajo Valor)', 'A+ (Homologación)','R/R+ (Regulados)'];
+            // Usamos data simulada o generada si no hay carga de archivo
+            const dataCounts = [500, 750, 1500, 300, 900];
+            const dataValue = [4500000000, 1500000000, 500000000, 800000000, 1000000000];
+
+            paretoChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Cantidad de Ítems (Unidades)',
+                            data: dataCounts,
+                            backgroundColor: colors,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Valor Total (COP)',
+                            data: dataValue,
+                            type: 'line',
+                            borderColor: '#312782', 
+                            borderWidth: 2,
+                            fill: false,
+                            yAxisID: 'y1',
+                            tension: 0.3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { position: 'top' },
+                        title: { display: true, text: 'Clasificación de Productos por Rotación y Valor (Simulado)' }
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: { display: true, text: 'Ítems' }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            grid: { drawOnChartArea: false },
+                            title: { display: true, text: 'Valor (COP)' },
+                            ticks: { callback: (value) => formatCurrency(value).replace(/\s/g, '').substring(0, 5) + 'M' }
+                        }
+                    }
+                }
+            });
+        };
+        
+        const renderCostSummary = () => {
+            const container = document.getElementById('cost-summary-table');
+            let totalMaxCost = 0;
+            let totalTotalCost = 0;
+
+            const rowsHtml = productData.map(group => {
+                // Sumar costos de los productos dentro de cada grupo
+                const maxCost = group.products.reduce((sum, p) => sum + p.costoMaximo, 0);
+                const totalCost = group.products.reduce((sum, p) => sum + p.costoTotal, 0);
+                totalMaxCost += maxCost;
+                totalTotalCost += totalCost;
+                const totalCostClass = group.regulated ? 'text-red-700' : 'text-secundario';
+
+                return `
+                    <tr class="${group.regulated ? 'regulated' : 'non-regulated'}">
+                        <td class="px-3 py-2 text-sm font-medium text-gray-900">${group.name}</td>
+                        <td class="px-3 py-2 whitespace-nowrap text-sm text-right text-gray-600">${group.products.length.toLocaleString('es-CO')}</td>
+                        <td class="px-3 py-2 whitespace-nowrap text-sm font-semibold text-right text-gray-700">${formatCurrency(maxCost)}</td>
+                        <td class="px-3 py-2 whitespace-nowrap text-sm font-semibold text-right ${totalCostClass}">${formatCurrency(totalCost)}</td>
+                    </tr>
+                `;
+            }).join('');
+            
+            const totalItems = productData.reduce((sum, g) => sum + g.products.length, 0);
+
+            const tableHtml = `
+                <table class="min-w-full divide-y divide-gray-200 border border-gray-100 rounded-lg">
+                    <thead class="table-header">
+                        <tr>
+                            <th class="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider rounded-tl-lg">Grupo de Productos</th>
+                            <th class="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider">Ítems (Cargados)</th>
+                            <th class="px-3 py-3 text-right text-xs font-medium uppercase tracking-wider">Suma Costo Máximo Compra (2025)</th>
+                            <th class="px-3 py-3 text-right text-xs font-medium uppercase tracking-wider rounded-tr-lg">Suma Costo Total (Incl. Indirectos)</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        ${rowsHtml}
+                    </tbody>
+                    <tfoot>
+                         <tr class="bg-gray-100 font-bold border-t-2 border-secundario">
+                            <td class="px-3 py-2 text-sm text-gray-800">TOTAL CONSOLIDADO</td>
+                            <td class="px-3 py-2 text-sm text-center text-primary-700">${totalItems.toLocaleString('es-CO')}</td>
+                            <td class="px-3 py-2 text-sm text-right text-primary-700">${formatCurrency(totalMaxCost)}</td>
+                            <td class="px-3 py-2 text-sm text-right text-secundario">${formatCurrency(totalTotalCost)}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            `;
+            container.innerHTML = tableHtml;
+        };
+
+        let scatterChartInstance = null;
+
+        const renderScatterChart = () => {
+             if (scatterChartInstance) {
+                scatterChartInstance.destroy();
+            }
+            const ctx = document.getElementById('scatterChart').getContext('2d');
+            const nonRegulatedProducts = productData
+                .filter(g => !g.regulated && g.name.toUpperCase() !== "PRODUCTOS NO FACTURABLES")
+                .flatMap(g => g.products.map(p => ({
+                    x: p.costoMaximo, 
+                    y: p.tarifaVentaActual, 
+                    group: g.name
+                })))
+                .filter(p => p.x > 0 && p.y > 0); // Filtra datos inconsistentes
+
+            if (nonRegulatedProducts.length === 0) {
+                 // Manejo de caso sin datos para el gráfico
+                 ctx.canvas.parentNode.innerHTML = '<div class="p-6 text-center text-gray-500">No hay suficientes datos de productos no regulados para mostrar el gráfico de dispersión. Cargue un archivo de costos.</div>';
+                 return;
+            }
+            
+            const minCost = Math.min(...nonRegulatedProducts.map(p => p.x));
+            const maxCost = Math.max(...nonRegulatedProducts.map(p => p.x));
+            
+            // Define la línea de referencia (Costo * 1.30)
+            const marginLine = [
+                { x: minCost, y: minCost * 1.3 },
+                { x: maxCost, y: maxCost * 1.3 }
+            ];
+
+            scatterChartInstance = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [
+                        {
+                            label: 'Tarifa Actual vs. Costo (Productos No Regulados)',
+                            data: nonRegulatedProducts,
+                            backgroundColor: '#312782', 
+                            pointRadius: 5,
+                            pointHoverRadius: 8
+                        },
+                        {
+                            label: 'Línea de Referencia (Costo + 30% Margen)',
+                            data: marginLine,
+                            type: 'line',
+                            borderColor: '#EC268F', 
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: false,
+                            tension: 0
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { position: 'top' },
+                        title: { display: true, text: 'Dispersión: Tarifa Venta (Y) vs. Costo Máximo (X)' },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const p = context.parsed;
+                                    return `Costo: ${formatCurrency(p.x)} | Tarifa: ${formatCurrency(p.y)}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            position: 'bottom',
+                            title: { display: true, text: 'Costo Máximo (COP)' },
+                            ticks: { callback: (value) => (value / 1000).toFixed(0) + 'K' }
+                        },
+                        y: {
+                            title: { display: true, text: 'Tarifa de Venta (COP)' },
+                            ticks: { callback: (value) => (value / 1000).toFixed(0) + 'K' }
+                        }
+                    }
+                }
+            });
+        };
+
+        const renderERSummary = () => {
+            const container = document.getElementById('er-summary-table');
+            let totalRevenue = 0;
+            let totalCost = 0;
+
+            const rowsHtml = productData.map(group => {
+                const revenue = group.totalRevenue;
+                const cost = group.totalCost;
+                const utility = revenue - cost;
+                const marginPercentage = revenue > 0 ? (utility / revenue) * 100 : 0;
+                totalRevenue += revenue;
+                totalCost += cost;
+                const utilityClass = utility > 0 ? 'text-secundario' : 'text-red-600'; 
+
+                return `
+                    <tr class="${group.regulated ? 'regulated' : 'non-regulated'}">
+                        <td class="px-3 py-2 text-sm font-medium text-gray-900">${group.name}</td>
+                        <td class="px-3 py-2 whitespace-nowrap text-sm text-right text-gray-600">${formatCurrency(revenue)}</td>
+                        <td class="px-3 py-2 whitespace-nowrap text-sm text-right text-gray-600">${formatCurrency(cost)}</td>
+                        <td class="px-3 py-2 whitespace-nowrap text-sm font-bold text-right ${utilityClass}">${formatCurrency(utility)}</td>
+                        <td class="px-3 py-2 whitespace-nowrap text-sm font-bold text-right ${utilityClass}">${marginPercentage.toFixed(2)}%</td>
+                    </tr>
+                `;
+            }).join('');
+            
+            const totalUtility = totalRevenue - totalCost;
+            const totalMargin = totalRevenue > 0 ? (totalUtility / totalRevenue) * 100 : 0;
+            const totalUtilityClass = totalUtility > 0 ? 'text-secundario' : 'text-red-700';
+
+            const tableHtml = `
+                <table class="min-w-full divide-y divide-gray-200 border border-gray-100 rounded-lg">
+                    <thead class="table-header">
+                        <tr>
+                            <th class="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider rounded-tl-lg">Grupo de Productos</th>
+                            <th class="px-3 py-3 text-right text-xs font-medium uppercase tracking-wider">Ingreso Total (Venta Estimada)</th>
+                            <th class="px-3 py-3 text-right text-xs font-medium uppercase tracking-wider">Costo Total (Incl. Indirectos)</th>
+                            <th class="px-3 py-3 text-right text-xs font-medium uppercase tracking-wider">Utilidad Operacional (Margen Bruto)</th>
+                            <th class="px-3 py-3 text-right text-xs font-medium uppercase tracking-wider rounded-tr-lg">Margen Bruto (%)</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        ${rowsHtml}
+                    </tbody>
+                    <tfoot>
+                         <tr class="bg-gray-100 font-bold border-t-2 border-primary-200">
+                            <td class="px-3 py-2 text-sm text-gray-800">TOTAL CONSOLIDADO</td>
+                            <td class="px-3 py-2 text-sm text-right text-primary-700">${formatCurrency(totalRevenue)}</td>
+                            <td class="px-3 py-2 text-sm text-right text-primary-700">${formatCurrency(totalCost)}</td>
+                            <td class="px-3 py-2 text-sm text-right font-bold ${totalUtilityClass}">${formatCurrency(totalUtility)}</td>
+                            <td class="px-3 py-2 text-sm text-right font-bold ${totalUtilityClass}">${totalMargin.toFixed(2)}%</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            `;
+            container.innerHTML = tableHtml;
+        };
+
+        window.toggleTable = (groupId) => {
+            const contentDiv = document.getElementById(`content-${groupId}`);
+            const button = document.getElementById(`toggle-btn-${groupId}`);
+            const isCollapsed = contentDiv.classList.contains('collapsed');
+
+            if (isCollapsed) {
+                contentDiv.classList.remove('collapsed');
+                button.innerHTML = '<i class="fas fa-chevron-up mr-2"></i> Contraer Tabla';
+            } else {
+                contentDiv.classList.add('collapsed');
+                button.innerHTML = '<i class="fas fa-chevron-down mr-2"></i> Expandir Tabla';
+            }
+            const viewMoreBtn = document.getElementById(`view-more-btn-${groupId}`);
+            if (viewMoreBtn) {
+                const isShowingAll = viewMoreBtn.textContent.includes('Mostrar solo');
+                if (isCollapsed && isShowingAll) {
+                    toggleViewAllRows(groupId, 10);
+                }
+            }
+        };
+
+        const renderGroupDetails = () => {
+            const groupsContainer = document.getElementById('product-groups');
+            let html = '';
+            const MAX_VISIBLE_ROWS = 10; 
+
+            productData.forEach(group => {
+                const cleanName = group.name.replace(/\s/g, '_');
+                const isRegulated = group.regulated;
+                const description = isRegulated 
+                    ? 'NOTA: Precios de Venta NO pueden aumentar el techo máximo regulado.'
+                    : 'DEFINICIÓN DE TARIFA: Usar el margen de utilidad propuesto para obtener la Tarifa 2026.';
+
+                const groupBorderColor = isRegulated ? 'border-red-300' : 'border-secundario';
+                const groupTextColor = isRegulated ? 'text-red-700' : 'text-secundario';
+                const buttonColorClasses = isRegulated 
+                    ? 'bg-red-50 text-red-600 hover:bg-red-100' 
+                    : 'bg-green-50 text-secundario hover:bg-green-100';
+
+
+                html += `
+                    <div class="border rounded-xl shadow-md overflow-hidden ${groupBorderColor} border-t-4">
+                        <div class="color-principal text-white p-3 flex justify-between items-center">
+                            <h3 class="text-lg font-bold">VI. Detalle y Propuesta de Tarifa - ${group.name}</h3>
+                            ${group.products.length > MAX_VISIBLE_ROWS ? `
+                                <button id="toggle-btn-${cleanName}" onclick="toggleTable('${cleanName}')" class="text-xs font-semibold p-1 rounded-lg bg-white bg-opacity-10 hover:bg-opacity-20 transition duration-150">
+                                    <i class="fas fa-chevron-down mr-1"></i> Expandir Tabla
+                                </button>
+                            ` : ''}
+                        </div>
+
+                        <div class="p-4">
+                            <p class="text-sm text-gray-600 ${groupTextColor} font-medium mb-4">${description}</p>
+                        
+                            <div id="content-${cleanName}" class="${group.products.length > MAX_VISIBLE_ROWS ? 'collapsed' : ''} overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="table-header">
+                                        <tr>
+                                            <th class="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider rounded-tl-lg">ID</th>
+                                            <th class="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider">Descripción Producto</th>
+                                            <th class="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider">Existencias</th>
+                                            <th class="px-3 py-3 text-right text-xs font-medium uppercase tracking-wider">Costo Máximo (2025)</th>
+                                            <th class="px-3 py-3 text-center text-xs font-medium uppercase tracking-wider">Clasif. Pareto</th>
+                                            <th class="px-3 py-3 text-right text-xs font-medium uppercase tracking-wider">Tarifa Venta Actual</th>
+                                            <th class="px-3 py-3 text-right text-xs font-medium uppercase tracking-wider">Margen Propuesto (%)</th>
+                                            <th class="px-3 py-3 text-right text-xs font-medium uppercase tracking-wider rounded-tr-lg">Tarifa Venta 2026</th>
+                                            <th class="px-3 py-3 text-center text-xs font-medium uppercase tracking-wider rounded-tr-lg">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white divide-y divide-gray-200" id="table-body-${cleanName}">
+                                        ${group.products.map((product, index) => {
+                                            const isHidden = index >= MAX_VISIBLE_ROWS;
+                                            return `
+                                                <tr class="${isRegulated ? 'regulated' : 'non-regulated'} ${isHidden ? 'table-row-hidden' : ''}" data-row-index="${index}">
+                                                    <td class="px-3 py-2 whitespace-nowrap text-xs text-gray-500">${product.id}</td>
+                                                    <td class="px-3 py-2 text-sm font-medium text-gray-900">${product.description}</td>
+                                                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500 text-center">${product.existingUnits.toLocaleString('es-CO')}</td>
+                                                    <td class="px-3 py-2 whitespace-nowrap text-sm font-semibold text-right text-gray-700">${formatCurrency(product.costoMaximo)}</td>
+                                                    <td class="px-3 py-2 whitespace-nowrap text-sm font-medium text-center text-secundario">${product.clasificacionPareto}</td>
+                                                    <td class="px-3 py-2 whitespace-nowrap text-sm text-right text-gray-600">$<span id="actual-rate-${product.id}">${formatCurrency(product.tarifaVentaActual).replace('COP', '').trim()}</span></td>
+                                                    
+                                                    <td class="px-3 py-2 whitespace-nowrap">
+                                                        ${isRegulated 
+                                                            ? `<span class="text-red-500 font-bold">REGULADO</span>` 
+                                                            : `<input type="number" id="margin-${product.id}" value="${Math.round(Math.random() * 30) + 30}" min="10" max="90" step="5" 
+                                                                        class="w-20 text-right border border-gray-300 rounded-md p-1 text-sm focus:ring-terciario focus:border-terciario" 
+                                                                        data-costo="${product.costoMaximo}" 
+                                                                        data-product-id="${product.id}"
+                                                                        oninput="calculateNewRate(this)">%`
+                                                        }
+                                                    </td>
+                                                    
+                                                    <td class="px-3 py-2 whitespace-nowrap text-sm font-bold text-right">
+                                                        $<span id="new-rate-${product.id}" class="${isRegulated ? 'text-red-700' : 'text-secundario'}">
+                                                            ${isRegulated ? formatCurrency(product.tarifaVentaActual) : formatCurrency(calculateInitialNewRate(product.costoMaximo, (Math.round(Math.random() * 30) + 30))).replace('COP', '').trim()}
+                                                        </span>
+                                                    </td>
+                                                    <td class="px-3 py-2 whitespace-nowrap text-sm text-center">
+                                                        <button onclick="applyNewRate('${product.id}')" class="text-terciario hover:text-red-600 text-xs font-semibold ${isRegulated ? 'opacity-50 cursor-not-allowed' : ''}" ${isRegulated ? 'disabled' : ''}>
+                                                            APLICAR
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            `;
+                                        }).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                            ${group.products.length > MAX_VISIBLE_ROWS ? `
+                                <div class="mt-4 text-center">
+                                    <button id="view-more-btn-${cleanName}" onclick="toggleViewAllRows('${cleanName}', ${MAX_VISIBLE_ROWS})" 
+                                        class="text-sm font-medium text-terciario hover:text-pink-600 transition duration-150">
+                                        Ver todos los ${group.products.length} ítems
+                                    </button>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+
+            groupsContainer.innerHTML = html;
+
+            productData.forEach(group => {
+                const cleanName = group.name.replace(/\s/g, '_');
+                if (group.products.length > MAX_VISIBLE_ROWS) {
+                    const contentDiv = document.getElementById(`content-${cleanName}`);
+                    const button = document.getElementById(`toggle-btn-${cleanName}`);
+                    if (contentDiv) contentDiv.classList.add('collapsed');
+                    if (button) button.innerHTML = '<i class="fas fa-chevron-down mr-1"></i> Expandir Tabla';
+                }
+            });
+        };
+        
+        window.toggleViewAllRows = (groupId, maxVisible) => {
+            const tableBody = document.getElementById(`table-body-${groupId}`);
+            const rows = tableBody.querySelectorAll('[data-row-index]');
+            const button = document.getElementById(`view-more-btn-${groupId}`);
+            
+            let showingAll = false;
+            rows.forEach(row => {
+                const index = parseInt(row.getAttribute('data-row-index'));
+                if (index >= maxVisible) {
+                    if (row.classList.contains('table-row-hidden')) {
+                        row.classList.remove('table-row-hidden');
+                        showingAll = true;
+                    } else {
+                        row.classList.add('table-row-hidden');
+                    }
+                }
+            });
+
+            if (showingAll) {
+                button.textContent = `Mostrar solo las ${maxVisible} principales`;
+            } else {
+                button.textContent = `Ver todos los ${rows.length} ítems`;
+            }
+        };
+
+        function calculateInitialNewRate(costo, marginPercentage) {
+            const newRate = costo * (1 + marginPercentage / 100);
+            return newRate;
+        }
+
+        function calculateNewRate(inputElement) {
+            const productId = inputElement.getAttribute('data-product-id');
+            const costo = parseFloat(inputElement.getAttribute('data-costo'));
+            let marginPercentage = parseFloat(inputElement.value);
+
+            if (isNaN(marginPercentage)) {
+                marginPercentage = 0;
+            }
+            if (marginPercentage > 100) marginPercentage = 100;
+            if (marginPercentage < 10) marginPercentage = 10;
+
+            // La tarifa de venta se calcula sobre el costo TOTAL, no solo sobre el costo máximo (PMC)
+            // Aquí deberíamos recalcular el Costo Total del producto específico si cambiamos la lógica del mock:
+            // Por ahora, asumimos que el data-costo es el costo total para mantener la simulación simple.
+            // Si estuviéramos conectados a una base de datos real, buscaríamos el costoTotal de ese producto.
+            
+            // Usamos el costo máximo (PMC) como base para la simulación
+            const costMaximo = parseFloat(inputElement.getAttribute('data-costo'));
+            const costoTotalRecalculado = calculateTotalCost(costMaximo);
+            
+            const newRate = costoTotalRecalculado * (1 + marginPercentage / 100);
+            
+            const newRateSpan = document.getElementById(`new-rate-${productId}`);
+            newRateSpan.textContent = formatCurrency(newRate).replace('COP', '').trim();
+        }
+
+        function applyNewRate(productId) {
+            const marginInput = document.getElementById(`margin-${productId}`);
+            const newRateSpan = document.getElementById(`new-rate-${productId}`);
+            const actualRateSpan = document.getElementById(`actual-rate-${productId}`);
+
+            const newRateValueText = newRateSpan.textContent.replace('$', '').replace(/\./g, '').replace(/,/g, '.').trim();
+            const newRateValue = parseFloat(newRateValueText);
+            
+            if (actualRateSpan) {
+                actualRateSpan.textContent = formatCurrency(newRateValue).replace('COP', '').trim();
+            }
+            
+            const row = marginInput.closest('tr');
+            row.classList.add('bg-yellow-200'); 
+            
+            showFeedback(`Tarifa de ${productId} propuesta y guardada para 2026 con ${marginInput.value}% de margen.`, 'success');
+        }
+
+        function showFeedback(message, type) {
+            let container = document.getElementById('feedback-container');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'feedback-container';
+                container.className = 'fixed top-4 right-4 z-50 space-y-2';
+                document.body.appendChild(container);
+            }
+
+            const alert = document.createElement('div');
+            const color = type === 'success' ? 'bg-green-100 border-secundario text-secundario' : 'bg-red-100 border-red-400 text-red-700';
+            
+            alert.className = `p-4 border-l-4 ${color} rounded-lg shadow-md transition-opacity duration-300 opacity-0 transform translate-y-2 max-w-sm`;
+            alert.innerHTML = `<p class="font-bold">${type === 'success' ? 'Éxito' : 'Error'}</p><p class="text-sm">${message}</p>`;
+            
+            container.appendChild(alert);
+
+            setTimeout(() => {
+                alert.classList.remove('opacity-0', 'translate-y-2');
+                alert.classList.add('opacity-100', 'translate-y-0');
+            }, 10);
+
+            setTimeout(() => {
+                alert.classList.remove('opacity-100', 'translate-y-0');
+                alert.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => alert.remove(), 300);
+            }, 4000);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            generateInitialMockData();
+            // Recalculate and render everything based on the initial mock data and cost structure
+            recalculateModel(); 
+            
+            renderSummaryCards();
+            renderCostSummary();
+            renderERSummary();
+            renderGroupDetails();
+            renderSignaturesTable(); 
+            
+            sections.forEach(id => {
+                const section = document.getElementById(id);
+                if (section) {
+                    sectionObserver.observe(section);
+                }
+            });
+
+            renderParetoChart();
+            renderScatterChart();
+
+            const firstButton = document.querySelector('.tab-button[data-section="section-I"]');
+            if (firstButton) {
+                firstButton.classList.add('active');
+            }
+        });
+    </script>
+</body>
+</html>
