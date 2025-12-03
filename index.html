@@ -30,29 +30,21 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Configuración Firebase desde el entorno
         const firebaseConfig = JSON.parse(__firebase_config);
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
-        // Estado Global gestionado por el módulo
         let user = null;
         let unsubscribeSnapshot = null;
 
-        // Referencias globales para funciones UI
         window.saveDataToFirebase = async () => {
-            if (!user) {
-                console.warn("Usuario no autenticado, no se puede guardar.");
-                return;
-            }
-
+            if (!user) return;
             const statusIndicator = document.getElementById('db-status');
             if(statusIndicator) statusIndicator.innerHTML = '<i class="fas fa-sync fa-spin text-yellow-400"></i> Guardando...';
 
             try {
-                // Guardamos la estructura general y los grupos detectados
                 const aggregatedData = {
                     productGroups: window.productGroups,
                     costStructure: window.costStructure,
@@ -64,13 +56,8 @@
                 const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'tariff_model_dashboard');
                 await setDoc(docRef, aggregatedData, { merge: true });
 
-                // Nota: No guardamos window.sheetsData completo en Firestore porque puede ser enorme.
-                // Guardamos solo los metadatos y configuración visual.
-
                 if(statusIndicator) statusIndicator.innerHTML = '<i class="fas fa-check-circle text-green-400"></i> Sincronizado';
-                setTimeout(() => {
-                   if(statusIndicator) statusIndicator.innerHTML = '<i class="fas fa-cloud text-blue-200"></i> En línea';
-                }, 3000);
+                setTimeout(() => { if(statusIndicator) statusIndicator.innerHTML = '<i class="fas fa-cloud text-blue-200"></i> En línea'; }, 3000);
 
             } catch (error) {
                 console.error("Error guardando en Firebase:", error);
@@ -79,22 +66,16 @@
         };
 
         const initAuth = async () => {
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (error) {
-                console.error("Error de autenticación:", error);
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                await signInWithCustomToken(auth, __initial_auth_token);
+            } else {
+                await signInAnonymously(auth);
             }
         };
 
         onAuthStateChanged(auth, (currentUser) => {
             user = currentUser;
-            if (user) {
-                setupRealtimeListener();
-            }
+            if (user) setupRealtimeListener();
         });
 
         const setupRealtimeListener = () => {
@@ -106,8 +87,6 @@
                     if(data.productGroups && data.productGroups.length > 0) window.productGroups = data.productGroups;
                     if(data.costStructure) window.costStructure = data.costStructure;
                     if(data.signatures) window.signatures = data.signatures;
-                    
-                    // Solo refrescamos UI si NO estamos cargando un archivo en este momento
                     if (!window.isProcessingFile) window.refreshUI(); 
                 }
             });
@@ -126,6 +105,20 @@
         .text-secundario { color: #008041; }
         .text-terciario { color: #EC268F; }
         
+        /* Colores Categorías */
+        .bg-cat-black { background-color: #000000; color: white; border: 1px solid #333; }
+        .bg-cat-elite { background-color: #4b0082; color: white; border: 1px solid #370061; }
+        .bg-cat-platino { background-color: #e5e4e2; color: #333; border: 1px solid #ccc; }
+        .bg-cat-oro { background-color: #ffd700; color: #5c4d00; border: 1px solid #e6c200; }
+        .bg-cat-plata { background-color: #c0c0c0; color: #333; border: 1px solid #a6a6a6; }
+        .bg-cat-clasicos { background-color: #3b82f6; color: white; border: 1px solid #2563eb; }
+        .bg-cat-regulados { background-color: #10b981; color: white; border: 1px solid #059669; }
+        .bg-cat-sinfreq { background-color: #ef4444; color: white; border: 1px solid #dc2626; }
+
+        .filter-btn { opacity: 0.6; transition: all 0.2s; transform: scale(0.95); }
+        .filter-btn:hover { opacity: 0.8; transform: scale(1); }
+        .filter-btn.active { opacity: 1; transform: scale(1.05); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2); z-index: 10; font-weight: bold; }
+        
         .table-input { width: 100%; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.25rem 0.5rem; font-size: 0.875rem; }
         .table-input:focus { outline: none; border-color: #312782; box-shadow: 0 0 0 2px rgba(49, 39, 130, 0.1); }
         
@@ -135,7 +128,6 @@
         .data-upload-zone { border: 2px dashed #cbd5e1; border-radius: 0.5rem; background-color: #f8fafc; transition: all 0.3s; }
         .data-upload-zone:hover { border-color: #312782; background-color: #eef2ff; }
         
-        /* Botones de Grupo (Libros) */
         .group-btn {
             display: flex; flex-direction: column; justify-content: center; align-items: center;
             padding: 1rem; border-radius: 0.5rem; border: 1px solid #e2e8f0;
@@ -146,7 +138,6 @@
         .group-btn.selected h3 { color: white; }
         .group-btn.selected span { color: #bfdbfe; }
         
-        /* Panel de detalles */
         .detail-panel {
             background: linear-gradient(to right, #f8fafc, #ffffff);
             border-left: 4px solid #312782;
@@ -154,6 +145,22 @@
         }
         @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 
+        /* Estilos Tabla Scrollable */
+        .inventory-table-container {
+            max-height: 500px;
+            overflow-y: auto;
+            overflow-x: auto;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.5rem;
+        }
+        .inventory-table th {
+            position: sticky;
+            top: 0;
+            background-color: #312782;
+            color: white;
+            z-index: 10;
+            white-space: nowrap;
+        }
     </style>
 </head>
 <body class="p-4 md:p-8 text-slate-800">
@@ -182,6 +189,9 @@
             </div>
 
             <div class="flex gap-3 z-10 flex-shrink-0">
+                <button onclick="resetApp()" class="bg-red-500 hover:bg-red-700 text-white px-5 py-2.5 rounded-lg shadow-md transition-colors flex items-center font-semibold text-sm ring-2 ring-red-500 ring-offset-2 ring-offset-blue-900" title="Borrar datos y reiniciar">
+                    <i class="fas fa-undo mr-2"></i> Restablecer
+                </button>
                 <button onclick="generatePDF()" class="bg-secundario hover:bg-green-700 text-white px-5 py-2.5 rounded-lg shadow-md transition-colors flex items-center font-semibold text-sm ring-2 ring-green-600 ring-offset-2 ring-offset-blue-900">
                     <i class="fas fa-file-pdf mr-2"></i> Generar PDF
                 </button>
@@ -190,7 +200,7 @@
 
         <main class="grid grid-cols-1 gap-8">
 
-            <!-- SECCIÓN I: Resumen Interactivo -->
+            <!-- SECCIÓN I: Resumen -->
             <section id="section-resumen" class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b pb-4 gap-4">
                     <div>
@@ -210,15 +220,12 @@
                     </div>
                 </div>
 
-                <!-- Botones de los Libros -->
                 <div id="book-buttons-container" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 mb-6">
-                    <!-- Se llena dinámicamente -->
                     <div class="col-span-full text-center py-8 text-slate-400 bg-slate-50 rounded border border-dashed border-slate-300">
                         <i class="fas fa-arrow-up mb-2"></i><br>Cargue un archivo Excel para visualizar los libros disponibles.
                     </div>
                 </div>
 
-                <!-- Panel de Detalle Desplegable -->
                 <div id="book-detail-panel" class="detail-panel hidden p-6 rounded-lg shadow-inner">
                     <div class="flex justify-between items-center mb-4">
                         <h3 id="detail-title" class="text-lg font-bold text-principal">Detalle del Libro</h3>
@@ -241,15 +248,13 @@
                 </div>
             </section>
 
-            <!-- SECCIÓN II: Pareto Filtrable -->
+            <!-- SECCIÓN II: Pareto -->
             <section id="section-graficos" class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                 <div class="flex flex-col sm:flex-row justify-between items-center mb-6 border-b pb-4 gap-4">
                     <div>
                         <h2 class="text-xl font-bold text-slate-700">II. Análisis de Pareto</h2>
                         <span class="text-xs text-slate-500">Clasificación basada en conteo de filas por categoría</span>
                     </div>
-                    
-                    <!-- SELECTOR DE LIBRO PARA PARETO -->
                     <div class="flex items-center gap-2 bg-slate-100 p-2 rounded-lg">
                         <label for="pareto-book-select" class="text-xs font-bold text-slate-600 uppercase"><i class="fas fa-filter mr-1"></i>Fuente:</label>
                         <select id="pareto-book-select" onchange="updateParetoBySheet(this.value)" class="text-sm border-none bg-transparent focus:ring-0 text-principal font-bold cursor-pointer outline-none">
@@ -257,55 +262,224 @@
                         </select>
                     </div>
                 </div>
-                
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <!-- Gráfico 1: Barras -->
                     <div class="bg-slate-50 p-4 rounded-lg border border-slate-100 shadow-sm">
                         <h3 class="text-sm font-semibold text-center mb-2 text-slate-600">Conteo por Clasificación (Filas)</h3>
-                        <div class="relative h-64">
-                            <canvas id="paretoChart"></canvas>
-                        </div>
+                        <div class="relative h-64"><canvas id="paretoChart"></canvas></div>
                     </div>
-                    <!-- Gráfico 2: Torta -->
                     <div class="bg-slate-50 p-4 rounded-lg border border-slate-100 shadow-sm">
                         <div class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-2">
                             <h3 class="text-sm font-semibold text-slate-600">Distribución %</h3>
                         </div>
-                        <div class="relative h-64 flex justify-center">
-                            <canvas id="paretoPieChart"></canvas>
-                        </div>
+                        <div class="relative h-64 flex justify-center"><canvas id="paretoPieChart"></canvas></div>
                     </div>
                 </div>
             </section>
 
-            <!-- SECCIÓN III: Costos Indirectos -->
+            <!-- SECCIÓN III: Detalle de Ítems (CON BÚSQUEDA) -->
+            <section id="section-detalle-items" class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <div class="flex flex-col lg:flex-row justify-between items-center mb-4 border-b pb-4 gap-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-700">III. Detalle de Ítems Farmacéuticos</h2>
+                        <p class="text-sm text-slate-500">Visualización detallada por libro cargado</p>
+                    </div>
+                    
+                    <!-- CONTROLES: LIBRO Y BÚSQUEDA -->
+                    <div class="flex flex-col sm:flex-row gap-3 items-center">
+                        <div class="flex items-center gap-2 bg-white border border-slate-300 p-1.5 rounded-lg shadow-sm focus-within:ring-2 focus-within:ring-blue-500 transition-all">
+                             <i class="fas fa-search text-slate-400 pl-2"></i>
+                             <input id="inventory-search-input" type="text" placeholder="Buscar por nombre o código..." 
+                                    class="text-xs border-none focus:ring-0 text-slate-700 w-48 outline-none"
+                                    onkeyup="if(event.key === 'Enter') searchInventory()">
+                             <button onclick="searchInventory()" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-1 rounded text-xs font-bold transition">
+                                Buscar
+                             </button>
+                             <button onclick="clearInventorySearch()" class="text-slate-400 hover:text-red-500 px-1 ml-1" title="Limpiar filtro">
+                                <i class="fas fa-times"></i>
+                             </button>
+                        </div>
+
+                        <div class="flex items-center gap-2 bg-slate-100 p-2 rounded-lg border border-slate-200">
+                            <label for="inventory-book-select" class="text-xs font-bold text-slate-600 uppercase"><i class="fas fa-book mr-1"></i>Libro:</label>
+                            <select id="inventory-book-select" onchange="renderInventoryTable(this.value)" class="text-sm border-none bg-transparent focus:ring-0 text-principal font-bold cursor-pointer outline-none">
+                                <option value="">Seleccione...</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="inventory-table-container">
+                    <table class="w-full text-xs text-left inventory-table">
+                        <thead class="text-xs uppercase bg-principal text-white">
+                            <tr>
+                                <th class="px-4 py-3">Cód. Producto</th>
+                                <th class="px-4 py-3">Descripción</th>
+                                <th class="px-4 py-3">Presentación</th>
+                                <th class="px-4 py-3 text-right">Precio 2025</th>
+                                <th class="px-4 py-3 text-right">Unidades</th>
+                                <th class="px-4 py-3 text-right">Valor Compra (Máx)</th>
+                                <th class="px-4 py-3">Estado</th>
+                                <th class="px-4 py-3">Observaciones</th>
+                                <th class="px-4 py-3">Homologación</th>
+                                <th class="px-4 py-3 text-center">Pareto</th>
+                                <th class="px-4 py-3 text-center">Ident. A+</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventory-table-body" class="divide-y divide-slate-100 bg-white">
+                            <tr>
+                                <td colspan="11" class="px-4 py-8 text-center text-slate-400">
+                                    Cargue un archivo y seleccione un libro para ver los datos.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- SECCIÓN: GRÁFICA DINÁMICA DE RESULTADOS -->
+            <section id="section-dynamic-analysis" class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hidden">
+                <div class="flex justify-between items-center mb-4 border-b pb-2">
+                    <h2 class="text-xl font-bold text-slate-700">Análisis Dinámico de Resultados</h2>
+                    <span id="chart-mode-badge" class="text-xs font-semibold px-2 py-1 rounded bg-blue-100 text-blue-800 border border-blue-200">
+                        <i class="fas fa-chart-bar mr-1"></i> Vista General
+                    </span>
+                </div>
+                <div class="relative h-80 w-full">
+                    <canvas id="dynamicAnalysisChart"></canvas>
+                </div>
+                <div class="mt-2 text-xs text-slate-500 text-center italic" id="chart-footer-text">
+                    Visualización automática basada en los filtros aplicados en la Sección III.
+                </div>
+            </section>
+
+            <!-- SECCIÓN IV: Costos Indirectos -->
             <section id="section-costos" class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                <h2 class="text-xl font-bold text-slate-700 mb-4 border-b pb-2">III. Estructura de Costos Indirectos</h2>
+                <div class="flex flex-col lg:flex-row justify-between items-center mb-4 border-b pb-2 gap-4">
+                    <h2 class="text-xl font-bold text-slate-700">IV. Estructura de Costos Indirectos</h2>
+                    
+                    <div class="flex items-center gap-2 bg-slate-50 p-1.5 rounded-lg border border-slate-200 shadow-sm opacity-90 hover:opacity-100 transition-opacity">
+                         <span class="text-[10px] text-slate-400 font-bold uppercase mr-1">Simular Item:</span>
+                         <select id="cost-book-select" class="text-xs border-none bg-transparent focus:ring-0 text-slate-600 font-semibold cursor-pointer outline-none max-w-[150px]">
+                            <option value="">Seleccionar Libro...</option>
+                        </select>
+                        <div class="h-4 w-px bg-slate-300 mx-1"></div>
+                        <input id="cost-search-input" type="text" placeholder="Código o nombre..." class="text-xs bg-transparent border-none focus:ring-0 outline-none w-32 text-slate-700">
+                        <button onclick="searchCostItem()" class="text-principal hover:text-blue-800 px-2 transition-colors">
+                            <i class="fas fa-calculator"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="cost-item-result" class="hidden mb-4 bg-blue-50 p-3 rounded-lg border border-blue-100 flex justify-between items-center text-sm animate-fade-in shadow-inner">
+                     <div class="flex items-center gap-3">
+                        <div class="bg-blue-100 text-blue-600 w-8 h-8 rounded-full flex items-center justify-center">
+                            <i class="fas fa-box"></i>
+                        </div>
+                        <div>
+                            <span class="font-bold text-blue-900 block" id="found-item-name">Nombre Producto</span>
+                            <span class="text-xs text-blue-600 font-mono" id="found-item-code">COD: 12345</span>
+                        </div>
+                     </div>
+                     <div class="text-right flex items-center gap-4">
+                        <div>
+                            <span class="text-[10px] text-blue-500 uppercase block font-bold">Costo Base Unitario</span>
+                            <span class="font-bold text-principal text-lg" id="found-item-price">$ 0</span>
+                        </div>
+                        <button onclick="clearCostSearch()" class="text-slate-400 hover:text-red-500 transition-colors" title="Limpiar y volver al general">
+                            <i class="fas fa-times-circle text-lg"></i>
+                        </button>
+                     </div>
+                </div>
+
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm text-left">
                         <thead class="text-xs text-white uppercase bg-principal">
                             <tr>
                                 <th class="px-4 py-3 rounded-tl-lg">Rubro</th>
                                 <th class="px-4 py-3 text-right">Porcentaje (%)</th>
-                                <th class="px-4 py-3 text-right rounded-tr-lg">Impacto (Ref)</th>
+                                <th class="px-4 py-3 text-right rounded-tr-lg">Impacto ($)</th>
                             </tr>
                         </thead>
                         <tbody id="cost-structure-body" class="divide-y divide-slate-100"></tbody>
                         <tfoot class="bg-slate-50 font-bold text-slate-700">
                             <tr>
-                                <td class="px-4 py-3">TOTAL</td>
+                                <td class="px-4 py-3">TOTAL COSTO INDIRECTO</td>
                                 <td class="px-4 py-3 text-right text-terciario" id="total-indirect-percent">0.00%</td>
                                 <td class="px-4 py-3 text-right" id="total-indirect-value">$ 0</td>
+                            </tr>
+                            <tr class="bg-blue-50 text-blue-900 border-t-2 border-blue-200">
+                                <td class="px-4 py-3">COSTO TOTAL (Base + Indirectos)</td>
+                                <td class="px-4 py-3 text-right"></td>
+                                <td class="px-4 py-3 text-right font-extrabold text-lg" id="final-total-cost">$ 0</td>
                             </tr>
                         </tfoot>
                     </table>
                 </div>
             </section>
 
-            <!-- SECCIÓN IV: Firmas -->
+            <!-- SECCIÓN V: Caracterización de Bienes (DINÁMICA + FILTROS) -->
+            <section id="section-caracterizacion" class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 border-b pb-4 gap-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-700">V. Caracterización de Bienes</h2>
+                        <p class="text-sm text-slate-500">Clasificación dinámica de todo el inventario cargado</p>
+                    </div>
+                    
+                    <div class="flex flex-col gap-3 items-end">
+                        <div class="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200 w-full sm:w-auto">
+                            <label for="increment-percent" class="text-xs font-bold text-slate-600 uppercase">Incremento 2026 (%):</label>
+                            <input type="number" id="increment-percent" value="10" class="table-input w-16 text-right font-bold text-principal" onchange="renderCharacterizationTable(document.getElementById('char-book-select').value)">
+                        </div>
+
+                        <div class="flex items-center gap-2 bg-slate-100 p-2 rounded-lg border border-slate-200 w-full sm:w-auto">
+                            <label for="char-book-select" class="text-xs font-bold text-slate-600 uppercase"><i class="fas fa-book mr-1"></i>Libro:</label>
+                            <select id="char-book-select" onchange="renderCharacterizationTable(this.value)" class="text-sm border-none bg-transparent focus:ring-0 text-principal font-bold cursor-pointer outline-none">
+                                <option value="">Seleccione...</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FILTROS DE CATEGORÍA (Botones informativos) -->
+                <div class="flex flex-wrap gap-2 mb-4 justify-center" id="category-filters">
+                    <!-- El contenido de este div se generará dinámicamente en JS -->
+                </div>
+
+                <div class="inventory-table-container mb-8">
+                    <table class="w-full text-xs text-left inventory-table">
+                        <thead class="text-xs uppercase bg-principal text-white" id="char-table-head">
+                            <!-- Columnas dinámicas aquí -->
+                        </thead>
+                        <tbody id="char-table-body" class="divide-y divide-slate-100 bg-white">
+                            <tr>
+                                <td class="px-4 py-8 text-center text-slate-400">
+                                    Cargue un archivo y seleccione un libro para ver la caracterización.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- GRÁFICAS DE CARACTERIZACIÓN (DOS COLUMNAS) -->
+                <div class="border-t pt-6">
+                    <h3 class="text-sm font-bold text-slate-700 mb-4 text-center">Distribución Estratégica del Portafolio (Categorización)</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div class="relative h-64 w-full">
+                            <h4 class="text-center text-xs font-bold mb-2 text-slate-500">Distribución %</h4>
+                            <canvas id="characterizationChart"></canvas> <!-- Gráfica de Dona -->
+                        </div>
+                        <div class="relative h-64 w-full">
+                             <h4 class="text-center text-xs font-bold mb-2 text-slate-500">Cantidad por Categoría</h4>
+                            <canvas id="characterizationBarChart"></canvas> <!-- Nueva Gráfica de Barras -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECCIÓN VI: Firmas (ANTES V) -->
             <section id="section-firmas" class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                 <div class="flex justify-between items-center mb-4 border-b pb-2">
-                    <h2 class="text-xl font-bold text-slate-700">IV. Firmas</h2>
+                    <h2 class="text-xl font-bold text-slate-700">VI. Firmas</h2>
                     <button onclick="addSignature()" class="text-xs bg-principal text-white px-3 py-1 rounded hover:bg-blue-800"><i class="fas fa-plus"></i></button>
                 </div>
                 <div class="overflow-x-auto">
@@ -320,13 +494,17 @@
     <script>
         // --- ESTADO GLOBAL ---
         window.isProcessingFile = false;
-        window.sheetsData = {}; // Almacena datos crudos por nombre de hoja: { "Medicamentos": [...Rows], "Dispositivos": [...] }
-        window.productGroups = []; // Metadatos de los libros para botones
-        
+        window.sheetsData = {};
+        window.productGroups = [];
+        window.currentBaseCost = 1000000000;
         let Logo_HUHMP_Blanco = ""; 
         let currentPieMode = 'count';
+        let dynamicAnalysisChart = null;
+        let characterizationChart = null; // Chart Dona
+        let characterizationBarChart = null; // Chart Barras
+        let currentCategoryFilter = 'ALL';
 
-        // Datos por defecto
+        // Configuraciones Iniciales
         window.costStructure = [
             { id: 1, name: "Mano de Obra", percent: 5.0 },
             { id: 2, name: "Dispensación", percent: 3.0 },
@@ -340,26 +518,149 @@
             { role: "APROBÓ", name: "Dr. Carlos Ruiz", cargo: "Gerente General" }
         ];
 
-        // --- INICIALIZACIÓN ---
         window.onload = () => {
             initLogo();
             renderCostStructure();
             renderSignatures();
             initCharts();
-            window.refreshUI(); // Renderiza estado inicial si hay datos en Firebase
+            initDynamicChart();
+            initCharacterizationCharts(); // Inicializar ambos charts de sección V
+            window.refreshUI();
         };
 
-        // UI Refresh llamado desde Firebase o Carga Local
         window.refreshUI = function() {
             renderSummaryButtons();
-            populateParetoSelector();
-            // Por defecto mostramos el consolidado o el primer libro disponible
+            populateSelectors();
             updateParetoBySheet('all');
             renderCostStructure();
             renderSignatures();
         }
 
-        // --- LOGO ---
+        window.resetApp = function() {
+            if(!confirm("¿Estás seguro de que deseas restablecer toda la aplicación? Se perderán los datos cargados no guardados.")) return;
+            window.isProcessingFile = false;
+            window.sheetsData = {};
+            window.productGroups = [];
+            window.currentBaseCost = 1000000000;
+            currentCategoryFilter = 'ALL';
+            
+            document.getElementById('pharmacy-file-upload').value = "";
+            document.getElementById('Logo_HUHMP_Blanco_Input').value = "";
+            initLogo();
+            
+            if(paretoChart) { paretoChart.data.labels = []; paretoChart.data.datasets[0].data = []; paretoChart.update(); }
+            if(pieChart) { pieChart.data.labels = []; pieChart.data.datasets[0].data = []; pieChart.update(); }
+            if(dynamicAnalysisChart) { 
+                dynamicAnalysisChart.data.labels = []; 
+                dynamicAnalysisChart.data.datasets = []; 
+                dynamicAnalysisChart.update(); 
+                document.getElementById('section-dynamic-analysis').classList.add('hidden');
+            }
+            // Reset nuevos charts
+            if(characterizationChart) { characterizationChart.data.labels=[]; characterizationChart.data.datasets[0].data=[]; characterizationChart.update(); }
+            if(characterizationBarChart) { characterizationBarChart.data.labels=[]; characterizationBarChart.data.datasets[0].data=[]; characterizationBarChart.update(); }
+            document.getElementById('category-filters').innerHTML = ''; // Limpiar botones
+
+            document.getElementById('book-detail-panel').classList.add('hidden');
+            document.getElementById('cost-item-result').classList.add('hidden');
+            document.getElementById('inventory-search-input').value = "";
+            document.getElementById('cost-search-input').value = "";
+            document.getElementById('upload-status-text').innerText = "Excel Multilibro (.xlsx, .xlsm)";
+            document.getElementById('upload-status-text').className = "text-xs text-slate-500";
+
+            window.refreshUI();
+        }
+
+        // --- CHART DINÁMICO ---
+        function initDynamicChart() {
+            const ctx = document.getElementById('dynamicAnalysisChart').getContext('2d');
+            dynamicAnalysisChart = new Chart(ctx, {
+                type: 'bar',
+                data: { labels: [], datasets: [] },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top' },
+                        tooltip: { callbacks: { label: function(context) { let label = context.dataset.label || ''; if (label) { label += ': '; } if (context.parsed.y !== null) { label += new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' }).format(context.parsed.y); } return label; } } }
+                    },
+                    scales: { y: { beginAtZero: true, title: {display: true, text: 'Valor (COP)'} } }
+                }
+            });
+        }
+
+        function initCharacterizationCharts() {
+            // Dona (Izquierda)
+            const ctxDona = document.getElementById('characterizationChart').getContext('2d');
+            characterizationChart = new Chart(ctxDona, {
+                type: 'doughnut',
+                data: { labels: [], datasets: [{ data: [], backgroundColor: [] }] },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'right' } }
+                }
+            });
+
+            // Barras (Derecha)
+            const ctxBarras = document.getElementById('characterizationBarChart').getContext('2d');
+            characterizationBarChart = new Chart(ctxBarras, {
+                type: 'bar',
+                data: { labels: [], datasets: [{ data: [], backgroundColor: [] }] },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } }, // No leyenda porque los colores y etiquetas explican
+                    scales: {
+                        y: { beginAtZero: true, title: { display: true, text: 'N° Ítems' } }
+                    }
+                }
+            });
+        }
+
+        function updateDynamicAnalysisChart(data) {
+            const section = document.getElementById('section-dynamic-analysis');
+            const badge = document.getElementById('chart-mode-badge');
+            if(!data || data.length === 0) { section.classList.add('hidden'); return; }
+            section.classList.remove('hidden');
+
+            if (data.length <= 20) {
+                badge.innerHTML = '<i class="fas fa-search-dollar mr-1"></i> Comparativo de Precios';
+                badge.className = "text-xs font-semibold px-2 py-1 rounded bg-green-100 text-green-800 border border-green-200";
+                const labels = data.map(row => { const desc = getColumnVal(row, ['descripción', 'descripcion']).toString(); return desc.length > 20 ? desc.substring(0, 20) + '...' : desc; });
+                const prices = data.map(row => cleanCurrency(getColumnVal(row, ['precio 2025'])));
+                const buyValues = data.map(row => cleanCurrency(getColumnVal(row, ['valor máximo', 'valor maximo'])));
+
+                dynamicAnalysisChart.data = {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Precio 2025', data: prices, backgroundColor: 'rgba(49, 39, 130, 0.7)', borderColor: '#312782', borderWidth: 1 },
+                        { label: 'Valor Compra Máx.', data: buyValues, backgroundColor: 'rgba(0, 128, 65, 0.6)', borderColor: '#008041', borderWidth: 1 }
+                    ]
+                };
+            } else {
+                badge.innerHTML = '<i class="fas fa-chart-pie mr-1"></i> Valorización por Categoría';
+                badge.className = "text-xs font-semibold px-2 py-1 rounded bg-blue-100 text-blue-800 border border-blue-200";
+                const aggregatedValues = {};
+                data.forEach(row => {
+                    let cat = getColumnVal(row, ['pareto', 'páreto', 'clasificación']);
+                    cat = (cat || 'SIN CLASIFICAR').toString().trim().toUpperCase();
+                    if(cat === '') cat = 'SIN CLASIFICAR';
+                    const price = cleanCurrency(getColumnVal(row, ['precio 2025']));
+                    const units = parseFloat(getColumnVal(row, ['unidades', 'n° unidades'])) || 0;
+                    aggregatedValues[cat] = (aggregatedValues[cat] || 0) + (price * units);
+                });
+                const labels = Object.keys(aggregatedValues).sort();
+                const values = labels.map(k => aggregatedValues[k]);
+                dynamicAnalysisChart.data = {
+                    labels: labels,
+                    datasets: [{ label: 'Valor Total de Inventario', data: values, backgroundColor: ['#312782', '#008041', '#EC268F', '#fbbf24', '#60a5fa', '#94a3b8'], borderWidth: 1 }]
+                };
+            }
+            dynamicAnalysisChart.update();
+        }
+
+        // --- HELPERS ---
         function initLogo() {
             const c = document.createElement('canvas'); c.width=200; c.height=200;
             const x = c.getContext('2d'); x.fillStyle='#FFF'; x.beginPath();
@@ -370,14 +671,13 @@
         }
         function updateSpecificLogo(i){ if(i.files[0]){ const r=new FileReader(); r.onload=e=>{Logo_HUHMP_Blanco=e.target.result; document.getElementById('Logo_HUHMP_Blanco_Preview').src=Logo_HUHMP_Blanco;}; r.readAsDataURL(i.files[0]); } }
 
-        // --- PROCESAMIENTO EXCEL MULTI-LIBRO ---
         function handlePharmacyFileUpload(event) {
             const file = event.target.files[0];
             const status = document.getElementById('upload-status-text');
             if (!file) return;
 
             window.isProcessingFile = true;
-            status.innerText = "Procesando libros...";
+            status.innerText = "Procesando...";
             status.className = "text-xs text-blue-600 font-bold";
 
             const reader = new FileReader();
@@ -389,16 +689,12 @@
                     window.sheetsData = {};
                     window.productGroups = [];
 
-                    // Iterar sobre cada hoja (Libro) del Excel
                     workbook.SheetNames.forEach(sheetName => {
                         const worksheet = workbook.Sheets[sheetName];
                         const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
                         
                         if (jsonData.length > 0) {
-                            // Guardamos data cruda
                             window.sheetsData[sheetName] = jsonData;
-                            
-                            // Analizamos resumen para el botón
                             const summary = analyzeSheetSummary(jsonData);
                             window.productGroups.push({
                                 name: sheetName,
@@ -412,12 +708,11 @@
 
                     onSuccessUpload(window.productGroups.length);
                     window.refreshUI();
-                    
                     if(window.saveDataToFirebase) window.saveDataToFirebase();
                     
                 } catch (error) {
                     console.error(error);
-                    status.innerText = "Error leyendo archivo";
+                    status.innerText = "Error";
                     status.className = "text-xs text-red-600 font-bold";
                 } finally {
                     window.isProcessingFile = false;
@@ -426,38 +721,398 @@
             reader.readAsArrayBuffer(file);
         }
 
+        function getColumnVal(row, possibleKeys) {
+            const rowKeys = Object.keys(row);
+            const matchedKey = rowKeys.find(rk => {
+                const normRK = normalizeHeader(rk);
+                return possibleKeys.some(pk => normRK.includes(pk));
+            });
+            return matchedKey ? row[matchedKey] : '';
+        }
+
+        function normalizeHeader(h) { return h ? h.toString().toLowerCase().trim().replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ') : ''; }
+
+        window.renderInventoryTable = function(sheetName, searchQuery = "") {
+            const tbody = document.getElementById('inventory-table-body');
+            tbody.innerHTML = '';
+            
+            const select = document.getElementById('inventory-book-select');
+            if(select.value !== sheetName && sheetName) select.value = sheetName;
+
+            if (!sheetName || !window.sheetsData[sheetName]) {
+                tbody.innerHTML = '<tr><td colspan="11" class="px-4 py-8 text-center text-slate-400">Seleccione un libro válido.</td></tr>';
+                document.getElementById('section-dynamic-analysis').classList.add('hidden'); 
+                return;
+            }
+
+            let data = window.sheetsData[sheetName];
+            if (searchQuery) {
+                const query = searchQuery.toLowerCase().trim();
+                data = data.filter(row => {
+                    const codigo = getColumnVal(row, ['código', 'codigo', 'producto']).toString().toLowerCase();
+                    const desc = getColumnVal(row, ['descripción', 'descripcion']).toString().toLowerCase();
+                    return codigo.includes(query) || desc.includes(query);
+                });
+            }
+            updateDynamicAnalysisChart(data);
+
+            const displayData = data.slice(0, 500); 
+
+            if (displayData.length === 0) {
+                 tbody.innerHTML = '<tr><td colspan="11" class="px-4 py-8 text-center text-slate-400">No se encontraron ítems que coincidan con la búsqueda.</td></tr>';
+                 return;
+            }
+
+            const html = displayData.map(row => {
+                const codigo = getColumnVal(row, ['código', 'codigo', 'producto']);
+                const desc = getColumnVal(row, ['descripción', 'descripcion']);
+                const pres = getColumnVal(row, ['presentación', 'presentacion']);
+                const precio = cleanCurrency(getColumnVal(row, ['precio 2025']));
+                const unidades = parseFloat(getColumnVal(row, ['unidades', 'n° unidades'])) || 0;
+                const valCompra = cleanCurrency(getColumnVal(row, ['valor máximo', 'valor maximo', 'ultimas vigencias']));
+                const estado = getColumnVal(row, ['estado']);
+                const obs = getColumnVal(row, ['observaciones', 'obsveraciones']);
+                const hom = getColumnVal(row, ['homologación', 'homologacion']);
+                const pareto = getColumnVal(row, ['pareto', 'páreto']);
+                const ident = getColumnVal(row, ['identificación', 'identificacion', 'a+']);
+
+                return `
+                    <tr class="hover:bg-slate-50 transition-colors border-b border-slate-100">
+                        <td class="px-4 py-2 font-mono text-xs text-slate-600">${codigo || '-'}</td>
+                        <td class="px-4 py-2 truncate max-w-xs" title="${desc}">${desc || '-'}</td>
+                        <td class="px-4 py-2">${pres || '-'}</td>
+                        <td class="px-4 py-2 text-right font-medium">${formatMoney(precio)}</td>
+                        <td class="px-4 py-2 text-right">${unidades}</td>
+                        <td class="px-4 py-2 text-right text-xs text-slate-500">${formatMoney(valCompra)}</td>
+                        <td class="px-4 py-2"><span class="px-2 py-0.5 rounded-full bg-slate-100 text-[10px]">${estado || 'N/A'}</span></td>
+                        <td class="px-4 py-2 text-xs italic text-slate-500 truncate max-w-[100px]" title="${obs}">${obs || ''}</td>
+                        <td class="px-4 py-2 text-xs">${hom || ''}</td>
+                        <td class="px-4 py-2 text-center font-bold text-principal">${pareto || '-'}</td>
+                        <td class="px-4 py-2 text-center text-xs">${ident || '-'}</td>
+                    </tr>
+                `;
+            }).join('');
+            tbody.innerHTML = html;
+        }
+
+        // --- LÓGICA DE CARACTERIZACIÓN (SECCIÓN V) ---
+        window.applyCategoryFilter = function(category, btnElement) {
+            currentCategoryFilter = category;
+            
+            // UI Toggle
+            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active', 'scale-105', 'opacity-100'));
+            if(btnElement) btnElement.classList.add('active', 'scale-105', 'opacity-100');
+            
+            const currentBook = document.getElementById('char-book-select').value;
+            if(currentBook) renderCharacterizationTable(currentBook);
+        }
+
+        window.renderCharacterizationTable = function(sheetName) {
+            const thead = document.getElementById('char-table-head');
+            const tbody = document.getElementById('char-table-body');
+            tbody.innerHTML = '';
+            thead.innerHTML = '';
+
+            const select = document.getElementById('char-book-select');
+            if(select.value !== sheetName && sheetName) select.value = sheetName;
+
+            if (!sheetName || !window.sheetsData[sheetName]) {
+                tbody.innerHTML = '<tr><td colspan="100%" class="px-4 py-8 text-center text-slate-400">Seleccione un libro válido para la caracterización.</td></tr>';
+                return;
+            }
+
+            const rawData = window.sheetsData[sheetName];
+            const incrementPercent = parseFloat(document.getElementById('increment-percent').value) || 0;
+            const totalIndirectPercent = window.costStructure.reduce((sum, item) => sum + item.percent, 0);
+
+            // 1. GENERAR CABECERAS DINÁMICAS
+            const firstRow = rawData[0];
+            const originalHeaders = Object.keys(firstRow);
+            
+            let headerHTML = '<tr>';
+            originalHeaders.forEach(h => {
+                headerHTML += `<th class="px-4 py-3 whitespace-nowrap">${h}</th>`;
+            });
+            // Añadir nuevas columnas calculadas
+            headerHTML += '<th class="px-4 py-3 text-right bg-blue-50 border-l border-blue-200">Costos Indirectos</th>';
+            headerHTML += '<th class="px-4 py-3 text-right bg-blue-50">Costo Total</th>';
+            headerHTML += '<th class="px-4 py-3 text-right bg-blue-50">Costo 2026 (Proy)</th>';
+            headerHTML += '<th class="px-4 py-3 text-right bg-blue-900 text-white font-bold border-l border-blue-700">Tarifa Venta 2026</th>';
+            headerHTML += '<th class="px-4 py-3 text-center font-bold bg-blue-900 text-white">CATEGORIZACIÓN</th>';
+            headerHTML += '</tr>';
+            thead.innerHTML = headerHTML;
+
+            // 2. PROCESAR Y FILTRAR DATOS
+            let categoryCounts = {
+                'BLACK': 0, 'ELITE': 0, 'PLATINO': 0, 'ORO': 0, 'PLATA': 0,
+                'CLÁSICOS': 0, 'REGULADOS': 0, 'PRODUCTOS SIN FRECUENCIA DE USO': 0
+            };
+            
+            let processedData = rawData.map(row => {
+                const desc = getColumnVal(row, ['descripción', 'descripcion']);
+                const valCompra = cleanCurrency(getColumnVal(row, ['valor máximo', 'valor maximo', 'ultimas vigencias'])); // VALOR MÁXIMO DE COMPRA (ULTIMAS VIGENCIAS)
+                const precio2025 = cleanCurrency(getColumnVal(row, ['precio 2025'])); // Precio 2025
+
+                const pareto = (getColumnVal(row, ['pareto', 'páreto']) || 'N/A').toUpperCase().trim();
+                const identA = (getColumnVal(row, ['identificación', 'identificacion', 'a+']) || '').toUpperCase();
+
+                // 1. COSTOS INDIRECTOS = VALOR MÁXIMO DE COMPRA * % INDIRECTOS
+                const costosIndirectos = valCompra * (totalIndirectPercent / 100);
+
+                // 2. COSTO TOTAL = VALOR MÁXIMO DE COMPRA + COSTOS INDIRECTOS
+                const costoTotal = valCompra + costosIndirectos;
+
+                // 3. COSTO 2026 = COSTO TOTAL * INCREMENTO 2026
+                const costo2026 = costoTotal * (1 + (incrementPercent / 100));
+
+                // 4. TARIFA DE VENTA 2026 = PRECIO 2025 * INCREMENTO 2026
+                const tarifaVenta2026 = precio2025 * (1 + (incrementPercent / 100));
+
+                let category = "SIN FRECUENCIA";
+                let badgeClass = "bg-slate-100 text-slate-500";
+
+                if (pareto === 'A' && identA === 'SI') { category = "BLACK"; badgeClass = "bg-cat-black"; }
+                else if (pareto === 'A') { category = "ELITE"; badgeClass = "bg-cat-elite"; }
+                else if (pareto === 'B') { category = "ORO"; badgeClass = "bg-cat-oro"; }
+                else if (pareto === 'C') { category = "PLATA"; badgeClass = "bg-cat-plata"; }
+                else if (valCompra === 0) { category = "PRODUCTOS SIN FRECUENCIA DE USO"; badgeClass = "bg-cat-sinfreq"; }
+                else { category = "CLÁSICOS"; badgeClass = "bg-cat-clasicos"; }
+                
+                if (desc && desc.toLowerCase().includes('regulado')) { category = "REGULADOS"; badgeClass = "bg-cat-regulados"; }
+                
+                if (categoryCounts.hasOwnProperty(category)) {
+                    categoryCounts[category]++;
+                } else {
+                    categoryCounts[category] = 1; 
+                }
+
+                return { 
+                    ...row, 
+                    _costosIndirectos: costosIndirectos,
+                    _costoTotal: costoTotal,
+                    _costo2026: costo2026,
+                    _tarifaVenta2026: tarifaVenta2026, 
+                    _category: category, 
+                    _badgeClass: badgeClass 
+                };
+            });
+
+            // 2.1 ACTUALIZAR BOTONES CON CONTEOS
+            renderFilterButtons(categoryCounts, processedData.length);
+
+            // 2.2 ACTUALIZAR GRÁFICAS (Dona y Barras)
+            updateCharacterizationChartsData(categoryCounts);
+
+            // 2.3 APLICAR FILTRO VISUAL
+            if (currentCategoryFilter !== 'ALL') {
+                processedData = processedData.filter(d => d._category === currentCategoryFilter);
+            }
+
+            const displayData = processedData.slice(0, 500);
+
+            // 3. RENDERIZAR FILAS
+            const html = displayData.map(d => {
+                let rowHTML = '<tr class="hover:bg-slate-50 transition-colors border-b border-slate-100">';
+                
+                // Celdas originales
+                originalHeaders.forEach(h => {
+                    let val = d[h];
+                    if (typeof val === 'number' && val > 1000) val = formatMoney(val);
+                    rowHTML += `<td class="px-4 py-2 truncate max-w-xs text-xs border-r border-slate-50" title="${val}">${val}</td>`;
+                });
+
+                // Celdas calculadas
+                rowHTML += `<td class="px-4 py-2 text-right text-xs bg-blue-50 text-slate-600">${formatMoney(d._costosIndirectos)}</td>`;
+                rowHTML += `<td class="px-4 py-2 text-right text-xs bg-blue-50 text-slate-700 font-semibold">${formatMoney(d._costoTotal)}</td>`;
+                rowHTML += `<td class="px-4 py-2 text-right text-xs bg-blue-50 text-slate-800 font-bold">${formatMoney(d._costo2026)}</td>`;
+                rowHTML += `<td class="px-4 py-2 text-right font-extrabold text-white bg-blue-800 text-xs shadow-inner border-l-2 border-white">${formatMoney(d._tarifaVenta2026)}</td>`;
+                rowHTML += `<td class="px-4 py-2 text-center"><span class="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${d._badgeClass}">${d._category}</span></td>`;
+                
+                rowHTML += '</tr>';
+                return rowHTML;
+            }).join('');
+            
+            tbody.innerHTML = html || '<tr><td colspan="100%" class="px-4 py-8 text-center text-slate-400">No hay productos en esta categoría.</td></tr>';
+        }
+
+        function renderFilterButtons(counts, total) {
+            const container = document.getElementById('category-filters');
+            const filters = [
+                { id: 'ALL', label: `TODOS (${total})`, class: 'bg-slate-600 text-white' },
+                { id: 'BLACK', label: `BLACK (${counts['BLACK']})`, class: 'bg-cat-black' },
+                { id: 'ELITE', label: `ELITE (${counts['ELITE']})`, class: 'bg-cat-elite' },
+                { id: 'PLATINO', label: `PLATINO (${counts['PLATINO']})`, class: 'bg-cat-platino' },
+                { id: 'ORO', label: `ORO (${counts['ORO']})`, class: 'bg-cat-oro' },
+                { id: 'PLATA', label: `PLATA (${counts['PLATA']})`, class: 'bg-cat-plata' },
+                { id: 'CLÁSICOS', label: `CLÁSICOS (${counts['CLÁSICOS']})`, class: 'bg-cat-clasicos' },
+                { id: 'REGULADOS', label: `REGULADOS (${counts['REGULADOS']})`, class: 'bg-cat-regulados' },
+                { id: 'PRODUCTOS SIN FRECUENCIA DE USO', label: `SIN FREQ. (${counts['PRODUCTOS SIN FRECUENCIA DE USO']})`, class: 'bg-cat-sinfreq' }
+            ];
+
+            container.innerHTML = filters.map(f => `
+                <button 
+                    class="filter-btn text-[10px] px-2 py-1 rounded-full uppercase ${f.class} ${currentCategoryFilter === f.id ? 'active scale-105 opacity-100' : ''}" 
+                    onclick="applyCategoryFilter('${f.id}', this)">
+                    ${f.label}
+                </button>
+            `).join('');
+        }
+
+        function updateCharacterizationChartsData(counts) {
+            // Orden específico para coherencia visual
+            const order = ['BLACK', 'ELITE', 'PLATINO', 'ORO', 'PLATA', 'CLÁSICOS', 'REGULADOS', 'PRODUCTOS SIN FRECUENCIA DE USO'];
+            const labels = order.filter(k => counts[k] > 0);
+            const data = labels.map(k => counts[k]);
+            
+            const colorMap = {
+                'BLACK': '#000000', 'ELITE': '#4b0082', 'PLATINO': '#e5e4e2',
+                'ORO': '#ffd700', 'PLATA': '#c0c0c0', 'CLÁSICOS': '#3b82f6',
+                'REGULADOS': '#10b981', 'PRODUCTOS SIN FRECUENCIA DE USO': '#ef4444'
+            };
+            const colors = labels.map(l => colorMap[l] || '#888');
+
+            // Actualizar Dona
+            if(characterizationChart) {
+                characterizationChart.data = {
+                    labels: labels,
+                    datasets: [{ data: data, backgroundColor: colors, borderWidth: 1 }]
+                };
+                characterizationChart.update();
+            }
+
+            // Actualizar Barras
+            if(characterizationBarChart) {
+                characterizationBarChart.data = {
+                    labels: labels,
+                    datasets: [{ 
+                        data: data, 
+                        backgroundColor: colors, 
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }]
+                };
+                characterizationBarChart.update();
+            }
+        }
+
+        window.searchInventory = function() {
+            const sheetName = document.getElementById('inventory-book-select').value;
+            const query = document.getElementById('inventory-search-input').value;
+            if(!sheetName) { alert("Seleccione un libro primero."); return; }
+            renderInventoryTable(sheetName, query);
+        }
+
+        window.clearInventorySearch = function() {
+            document.getElementById('inventory-search-input').value = "";
+            const sheetName = document.getElementById('inventory-book-select').value;
+            renderInventoryTable(sheetName, "");
+        }
+
+        function populateSelectors() {
+            const paretoSelect = document.getElementById('pareto-book-select');
+            const invSelect = document.getElementById('inventory-book-select');
+            const costSelect = document.getElementById('cost-book-select'); 
+            const charSelect = document.getElementById('char-book-select'); 
+            
+            const currPareto = paretoSelect.value;
+            const currInv = invSelect.value;
+            const currCost = costSelect.value;
+            const currChar = charSelect.value;
+
+            let opts = '<option value="">Seleccione...</option>';
+            let paretoOpts = '<option value="all">CONSOLIDADO GENERAL</option>';
+            
+            window.productGroups.forEach(g => {
+                opts += `<option value="${g.name}">${g.name}</option>`;
+                paretoOpts += `<option value="${g.name}">${g.name}</option>`;
+            });
+
+            invSelect.innerHTML = opts;
+            paretoSelect.innerHTML = paretoOpts;
+            costSelect.innerHTML = opts; 
+            charSelect.innerHTML = opts;
+
+            if(window.productGroups.length > 0) {
+                if(!currInv) invSelect.value = window.productGroups[0].name;
+                if(!currChar) charSelect.value = window.productGroups[0].name;
+            }
+            if(currInv) invSelect.value = currInv;
+            if(currPareto) paretoSelect.value = currPareto;
+            if(currCost) costSelect.value = currCost;
+            if(currChar) charSelect.value = currChar;
+            
+            if(invSelect.value) renderInventoryTable(invSelect.value);
+            // Si ya hay data cargada y no se ha renderizado la tabla de caracterización, hazlo
+            if(charSelect.value && window.sheetsData[charSelect.value]) renderCharacterizationTable(charSelect.value);
+        }
+
+        window.searchCostItem = function() {
+            const sheetName = document.getElementById('cost-book-select').value;
+            const query = document.getElementById('cost-search-input').value.toLowerCase().trim();
+            const resultDiv = document.getElementById('cost-item-result');
+
+            if (!sheetName || !window.sheetsData[sheetName]) {
+                alert("Por favor seleccione un libro válido para buscar.");
+                return;
+            }
+            if (!query) return;
+
+            const data = window.sheetsData[sheetName];
+            
+            const found = data.find(row => {
+                const codigo = getColumnVal(row, ['código', 'codigo', 'producto']).toString().toLowerCase();
+                const desc = getColumnVal(row, ['descripción', 'descripcion']).toString().toLowerCase();
+                return codigo.includes(query) || desc.includes(query);
+            });
+
+            if (found) {
+                const name = getColumnVal(found, ['descripción', 'descripcion']);
+                const code = getColumnVal(found, ['código', 'codigo', 'producto']);
+                const price = cleanCurrency(getColumnVal(found, ['precio 2025']));
+
+                document.getElementById('found-item-name').innerText = name || "Sin Nombre";
+                document.getElementById('found-item-code').innerText = `COD: ${code || 'N/A'}`;
+                document.getElementById('found-item-price').innerText = formatMoney(price);
+
+                resultDiv.classList.remove('hidden');
+                
+                window.currentBaseCost = price; 
+                renderCostStructure();
+            } else {
+                alert("No se encontró ningún ítem con ese criterio.");
+                clearCostSearch();
+            }
+        }
+
+        window.clearCostSearch = function() {
+            document.getElementById('cost-search-input').value = "";
+            document.getElementById('cost-item-result').classList.add('hidden');
+            window.currentBaseCost = 1000000000;
+            renderCostStructure();
+        }
+
         function analyzeSheetSummary(data) {
             let totalCost = 0;
-            let totalRevenue = 0; // Proyectado si hubiera columna precio venta
             const keys = Object.keys(data[0]);
-            
-            // Detectar columnas
             const priceKey = keys.find(k => k.toLowerCase().includes('precio 2025'));
             const unitsKey = keys.find(k => k.toLowerCase().includes('unidades'));
             const paretoKey = keys.find(k => k.toLowerCase().includes('pareto'));
-
             let paretoCounts = {};
 
             data.forEach(row => {
                 const p = cleanCurrency(row[priceKey]);
                 const u = parseFloat(row[unitsKey]) || 0;
                 totalCost += (p * u);
-                
-                // Conteo Pareto
                 if(paretoKey) {
                     const cat = (row[paretoKey] || 'N/A').toString().trim().toUpperCase();
                     paretoCounts[cat] = (paretoCounts[cat] || 0) + 1;
                 }
             });
 
-            // Encontrar categoría más común
             let topPareto = 'N/A';
             let maxCount = 0;
-            Object.entries(paretoCounts).forEach(([k, v]) => {
-                if(v > maxCount && k !== 'N/A') { maxCount = v; topPareto = k; }
-            });
-
-            return { totalCost, totalRevenue: totalCost * 1.3, topPareto }; // Venta simulada +30% para demo
+            Object.entries(paretoCounts).forEach(([k, v]) => { if(v > maxCount && k!=='N/A') { maxCount = v; topPareto = k; } });
+            return { totalCost, totalRevenue: totalCost * 1.3, topPareto };
         }
 
         function cleanCurrency(val) {
@@ -475,11 +1130,9 @@
             status.className = "text-xs text-green-600 font-bold";
         }
 
-        // --- UI INTERACTIVA SECCIÓN I ---
         function renderSummaryButtons() {
             const container = document.getElementById('book-buttons-container');
             if (window.productGroups.length === 0) return;
-            
             container.innerHTML = window.productGroups.map((group, idx) => `
                 <div class="group-btn" onclick="selectBookDetail(${idx}, this)">
                     <div class="text-3xl text-principal mb-2"><i class="fas fa-book-medical"></i></div>
@@ -490,116 +1143,85 @@
         }
 
         window.selectBookDetail = function(index, btnElement) {
-            // Estilos de selección
             document.querySelectorAll('.group-btn').forEach(b => b.classList.remove('selected'));
             btnElement.classList.add('selected');
-
-            // Mostrar panel
             const group = window.productGroups[index];
             const panel = document.getElementById('book-detail-panel');
             panel.classList.remove('hidden');
-            
-            // Llenar datos
             document.getElementById('detail-title').innerText = group.name;
-            document.getElementById('detail-items-badge').innerText = `${group.count} Ítems Registrados`;
+            document.getElementById('detail-items-badge').innerText = `${group.count} Ítems`;
             document.getElementById('detail-cost').innerText = formatMoney(group.cost);
             document.getElementById('detail-revenue').innerText = formatMoney(group.revenue);
-            document.getElementById('detail-top-pareto').innerText = `Mayoría Tipo ${group.topPareto}`;
+            document.getElementById('detail-top-pareto').innerText = `Mayoría ${group.topPareto}`;
             
-            // Reiniciar animación
-            panel.style.animation = 'none';
-            panel.offsetHeight; /* trigger reflow */
-            panel.style.animation = null; 
-        }
-
-        // --- UI SECCIÓN II (PARETO) ---
-        function populateParetoSelector() {
-            const select = document.getElementById('pareto-book-select');
-            const currentVal = select.value;
-            
-            let options = '<option value="all">CONSOLIDADO GENERAL</option>';
-            window.productGroups.forEach(g => {
-                options += `<option value="${g.name}">${g.name.toUpperCase()}</option>`;
-            });
-            select.innerHTML = options;
-            if(currentVal && select.querySelector(`option[value="${currentVal}"]`)) select.value = currentVal;
+            document.getElementById('inventory-book-select').value = group.name;
+            renderInventoryTable(group.name);
+            document.getElementById('char-book-select').value = group.name;
+            renderCharacterizationTable(group.name);
         }
 
         window.updateParetoBySheet = function(sheetName) {
             let aggregatedCounts = {};
-            
-            const processData = (dataArray) => {
-                if(!dataArray || dataArray.length === 0) return;
-                const keys = Object.keys(dataArray[0]);
-                const paretoKey = keys.find(k => k.toLowerCase().includes('pareto') || k.toLowerCase().includes('clasificación'));
-                
-                if(!paretoKey) return;
-
-                dataArray.forEach(row => {
-                    let cat = (row[paretoKey] || 'SIN CLASIFICAR').toString().trim().toUpperCase();
+            const processData = (arr) => {
+                if(!arr || arr.length === 0) return;
+                arr.forEach(row => {
+                    let cat = getColumnVal(row, ['pareto', 'páreto', 'clasificación', 'clasificacion']);
+                    cat = (cat || 'SIN CLASIFICAR').toString().trim().toUpperCase();
                     if(cat === '') cat = 'SIN CLASIFICAR';
                     aggregatedCounts[cat] = (aggregatedCounts[cat] || 0) + 1;
                 });
             };
 
-            if (sheetName === 'all') {
-                // Iterar sobre todos los libros en sheetsData
-                Object.values(window.sheetsData).forEach(arr => processData(arr));
-            } else if (window.sheetsData[sheetName]) {
+            if(sheetName === 'all') {
+                if (window.sheetsData) Object.values(window.sheetsData).forEach(arr => processData(arr));
+            } else if(window.sheetsData && window.sheetsData[sheetName]) {
                 processData(window.sheetsData[sheetName]);
             }
 
-            // Preparar datos para Chart.js
             const labels = Object.keys(aggregatedCounts).sort();
             const counts = labels.map(k => aggregatedCounts[k]);
-            
-            // Actualizar gráficas
             updateChartsData(labels, counts);
         }
 
-        // --- GRÁFICOS ---
         let paretoChart, pieChart;
         const colors = ['#312782', '#008041', '#EC268F', '#fbbf24', '#60a5fa', '#94a3b8'];
 
         function initCharts() {
             const ctx1 = document.getElementById('paretoChart').getContext('2d');
-            paretoChart = new Chart(ctx1, {
-                type: 'bar',
-                data: { labels: [], datasets: [{ label: 'Conteo (Filas)', data: [], backgroundColor: colors, borderRadius: 4 }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
-            });
-
+            paretoChart = new Chart(ctx1, { type: 'bar', data: { labels: [], datasets: [{ label: 'Conteo', data: [], backgroundColor: colors }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } });
             const ctx2 = document.getElementById('paretoPieChart').getContext('2d');
-            pieChart = new Chart(ctx2, {
-                type: 'doughnut',
-                data: { labels: [], datasets: [{ data: [], backgroundColor: colors }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
-            });
+            pieChart = new Chart(ctx2, { type: 'doughnut', data: { labels: [], datasets: [{ data: [], backgroundColor: colors }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } } });
+        }
+        function updateChartsData(l, c) {
+            if(paretoChart) { paretoChart.data.labels = l; paretoChart.data.datasets[0].data = c; paretoChart.update(); }
+            if(pieChart) { pieChart.data.labels = l; pieChart.data.datasets[0].data = c; pieChart.update(); }
         }
 
-        function updateChartsData(labels, counts) {
-            if(paretoChart) {
-                paretoChart.data.labels = labels;
-                paretoChart.data.datasets[0].data = counts;
-                paretoChart.update();
-            }
-            if(pieChart) {
-                pieChart.data.labels = labels;
-                pieChart.data.datasets[0].data = counts;
-                pieChart.update();
-            }
-        }
-
-        // --- UTILIDADES ---
         function formatMoney(n) { return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n); }
 
         function renderCostStructure() {
-            document.getElementById('cost-structure-body').innerHTML = window.costStructure.map((i, idx) => `
+            const tbody = document.getElementById('cost-structure-body');
+            let totalIndirectVal = 0;
+            let totalPercent = 0;
+
+            const baseAmount = window.currentBaseCost; 
+
+            tbody.innerHTML = window.costStructure.map((i, idx) => {
+                totalPercent += i.percent;
+                const val = baseAmount * (i.percent / 100);
+                totalIndirectVal += val;
+                
+                return `
                 <tr><td class="px-4 py-2 text-slate-700">${i.name}</td>
                 <td class="px-4 py-2 text-right"><input type="number" value="${i.percent}" onchange="updateCost(${idx}, this.value)" class="table-input w-20 text-right"> %</td>
-                <td class="px-4 py-2 text-right text-xs text-slate-500">${formatMoney(1000000000 * (i.percent/100))}</td></tr>
-            `).join('');
+                <td class="px-4 py-2 text-right text-xs text-slate-500">${formatMoney(val)}</td></tr>
+            `}).join('');
+
+            document.getElementById('total-indirect-percent').innerText = totalPercent.toFixed(2) + "%";
+            document.getElementById('total-indirect-value').innerText = formatMoney(totalIndirectVal);
+            document.getElementById('final-total-cost').innerText = formatMoney(baseAmount + totalIndirectVal);
         }
+
         window.updateCost = (i,v) => { window.costStructure[i].percent = parseFloat(v)||0; renderCostStructure(); if(window.saveDataToFirebase) window.saveDataToFirebase(); };
 
         function renderSignatures() {
@@ -616,29 +1238,50 @@
         window.addSignature = () => { window.signatures.push({role:'REVISÓ',name:'',cargo:''}); renderSignatures(); if(window.saveDataToFirebase) window.saveDataToFirebase(); };
         window.rmSig = (i) => { if(confirm('¿Borrar?')){ window.signatures.splice(i,1); renderSignatures(); if(window.saveDataToFirebase) window.saveDataToFirebase(); } };
 
-        // --- PDF ---
         window.generatePDF = () => {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
             const pageWidth = doc.internal.pageSize.getWidth();
             
-            // Header
             doc.setFillColor(49, 39, 130); doc.rect(0, 0, pageWidth, 40, 'F');
             doc.setTextColor(255); doc.setFontSize(14); doc.text("ESE HOSPITAL UNIVERSITARIO", 15, 18);
             doc.text("HERNANDO MONCALEANO PERDOMO", 15, 25);
             try { doc.addImage(Logo_HUHMP_Blanco, 'PNG', pageWidth-35, 10, 20, 20); } catch(e){}
 
             let y = 50;
-            // Resumen de Libros
-            doc.setTextColor(49, 39, 130); doc.setFontSize(12); doc.text("I. RESUMEN DE LIBROS CARGADOS", 15, y);
+            doc.setTextColor(49, 39, 130); doc.setFontSize(12); doc.text("I. RESUMEN EJECUTIVO", 15, y);
             y += 10;
             const rows = window.productGroups.map(g => [g.name, g.count, formatMoney(g.cost)]);
-            doc.autoTable({ startY: y, head: [['Libro / Hoja', 'Cant. Items', 'Costo Total']], body: rows });
+            doc.autoTable({ startY: y, head: [['Libro', 'Items', 'Costo']], body: rows });
             
-            // Gráfica (Captura)
             y = doc.lastAutoTable.finalY + 15;
-            doc.text("II. GRÁFICA PARETO (Filas)", 15, y);
+            doc.text("II. GRÁFICA PARETO", 15, y);
             try { doc.addImage(document.getElementById('paretoChart').toDataURL('image/png'), 'PNG', 15, y+5, 180, 80); } catch(e){}
+
+            y += 90;
+            doc.text("III. DETALLE DE ÍTEMS (Muestra Parcial)", 15, y);
+            doc.setFontSize(10); doc.setTextColor(100);
+            doc.text("El detalle completo de ítems se encuentra en el anexo digital.", 15, y+7);
+            
+            y += 20;
+            doc.setTextColor(49, 39, 130); doc.setFontSize(12); 
+            doc.text("IV. COSTOS INDIRECTOS", 15, y);
+            y += 10;
+            const costData = window.costStructure.map(c => [c.name, c.percent + "%"]);
+            doc.autoTable({ startY: y, head: [['Rubro', '%']], body: costData });
+            
+            y = doc.lastAutoTable.finalY + 20;
+            doc.text("V. CARACTERIZACIÓN DE BIENES", 15, y);
+            doc.setFontSize(10); doc.setTextColor(100);
+            doc.text("Clasificación avanzada de bienes (BLACK, ELITE, ORO, ETC.) según proyección 2026.", 15, y+7);
+
+            y += 20;
+            doc.setTextColor(49, 39, 130); doc.setFontSize(12);
+            doc.text("VI. APROBACIONES", 15, y);
+            y += 20;
+            window.signatures.forEach((sig, i) => {
+                doc.text(`${sig.role}: ${sig.name} (${sig.cargo})`, 15, y + (i*10));
+            });
 
             doc.save('Informe_Tarifas_HUHMP.pdf');
         }
