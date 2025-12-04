@@ -14,17 +14,17 @@
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
+    <!-- jsPDF & AutoTable -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    
     <!-- PapaParse (CSV) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 
     <!-- SheetJS (Excel) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-    
-    <!-- jsPDF para generación de PDF -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" integrity="sha512-Xc2Q4o+RiwqYV1OZ9jW6r8MxxlI9iEiVYPyF9Whp5k0D8NOYht7dw/d5L6vG0xvTWWKJpAkM5sUu1bF37VQm4g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-
-<!-- Firebase SDKs -->
+    <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -122,6 +122,9 @@
         .table-input { width: 100%; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.25rem 0.5rem; font-size: 0.875rem; }
         .table-input:focus { outline: none; border-color: #312782; box-shadow: 0 0 0 2px rgba(49, 39, 130, 0.1); }
         
+        .logo-upload-area { cursor: pointer; border: 2px dashed rgba(255, 255, 255, 0.5); border-radius: 0.5rem; padding: 0.5rem; background-color: rgba(255, 255, 255, 0.1); }
+        .logo-upload-area:hover { background-color: rgba(255, 255, 255, 0.2); }
+        
         .data-upload-zone { border: 2px dashed #cbd5e1; border-radius: 0.5rem; background-color: #f8fafc; transition: all 0.3s; }
         .data-upload-zone:hover { border-color: #312782; background-color: #eef2ff; }
         
@@ -179,37 +182,32 @@
     <div class="max-w-7xl mx-auto space-y-6 flex-grow">
         
         <!-- ENCABEZADO -->
-                <header class="bg-principal text-white p-6 rounded-xl shadow-lg flex flex-col md:flex-row justify-between items-center gap-4 relative overflow-hidden">
+        <header class="bg-principal text-white p-6 rounded-xl shadow-lg flex flex-col md:flex-row justify-between items-center gap-4 relative overflow-hidden">
             <div class="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-16 -mt-16 pointer-events-none"></div>
-
+            
             <div class="flex items-center gap-4 z-10 w-full md:w-auto">
-                <!-- LOGO INSTITUCIONAL -->
-                <img 
-                    src="Logo_HUHMP_Blanco.png" 
-                    alt="ESE Hospital Universitario Hernando Moncaleano Perdomo"
-                    class="h-12 w-auto hidden sm:block"
-                >
-                <div class="flex-grow pl-2">
-                    <h1 class="text-2xl md:text-3xl font-bold leading-tight">
-                        Modelo de Tarifas Farmacéuticas
-                    </h1>
-                    <p class="text-blue-200 text-sm md:text-base">
-                        ESE Hospital Universitario Hernando Moncaleano Perdomo
-                    </p>
+                 <div class="logo-upload-area group" onclick="document.getElementById('Logo_HUHMP_Blanco_Input').click()" title="Clic para cargar el archivo local">
+                    <img id="Logo_HUHMP_Blanco_Preview" src="" alt="Logo Blanco" class="h-12 w-auto object-contain drop-shadow-md mb-1">
+                    <span class="text-[0.65rem] text-yellow-400 font-bold text-center block leading-tight mt-1"><i class="fas fa-upload mr-1"></i>Cargar archivo:<br>Logo_HUHMP_Blanco</span>
+                    <input type="file" id="Logo_HUHMP_Blanco_Input" accept="image/png, image/jpeg, image/svg+xml" class="hidden" onchange="updateSpecificLogo(this)">
+                </div>
+
+                <div class="flex-grow border-l border-blue-800 pl-4 ml-2">
+                    <h1 class="text-2xl md:text-3xl font-bold leading-tight">Modelo de Tarifas Farmacéuticas</h1>
+                    <p class="text-blue-200 text-sm md:text-base">ESE Hospital Universitario Hernando Moncaleano Perdomo</p>
                     <div class="flex items-center justify-between mt-1">
-                        <span class="text-xs bg-blue-800 px-2 py-0.5 rounded text-blue-100 border border-blue-700 font-mono">
-                            GD-SGI-M-005 | Vigencia 2026
-                        </span>
-                        <div id="db-status" class="text-[0.7rem] bg-black/20 px-2 rounded-full ml-4 inline-block">
-                            <i class="fas fa-circle-notch fa-spin"></i> Conectando...
-                        </div>
+                        <span class="text-xs bg-blue-800 px-2 py-0.5 rounded text-blue-100 border border-blue-700 font-mono">GD-SGI-M-005 | Vigencia 2026</span>
+                        <div id="db-status" class="text-[0.7rem] bg-black/20 px-2 rounded-full ml-4 inline-block"><i class="fas fa-circle-notch fa-spin"></i> Conectando...</div>
                     </div>
                 </div>
             </div>
 
-            <div class="flex gap-3 z-10 flex-shrink-0">
-                <button onclick="resetApp()" class="bg-red-500 hover:bg-red-700 text-white px-5 py-2.5 rounded-lg shadow-md transition-colors flex items-center font-semibold text-sm ring-2 ring-red-500 ring-offset-2 ring-offset-blue-900" title="Borrar datos y reiniciar">
+            <div class="flex flex-col gap-2 z-10 flex-shrink-0">
+                <button onclick="resetApp()" class="bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded-lg shadow-md transition-colors flex items-center justify-center font-semibold text-xs ring-1 ring-slate-500 w-full" title="Borrar datos y reiniciar">
                     <i class="fas fa-undo mr-2"></i> Restablecer
+                </button>
+                 <button onclick="generatePDF()" class="bg-secundario hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow-md transition-colors flex items-center justify-center font-semibold text-xs ring-1 ring-green-600 w-full">
+                    <i class="fas fa-file-invoice mr-2"></i> Descargar PDF
                 </button>
             </div>
         </header>
@@ -368,68 +366,21 @@
                 </div>
             </section>
 
-            <!-- SECCIÓN: GRÁFICA DINÁMICA DE RESULTADOS -->
-            <section id="section-dynamic-analysis" class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hidden">
-                <div class="flex justify-between items-center mb-4 border-b pb-2">
-                    <h2 class="text-xl font-bold text-slate-700">Análisis Dinámico de Resultados</h2>
-                    <span id="chart-mode-badge" class="text-xs font-semibold px-2 py-1 rounded bg-blue-100 text-blue-800 border border-blue-200">
-                        <i class="fas fa-chart-bar mr-1"></i> Vista General
-                    </span>
-                </div>
-                <div class="relative h-80 w-full">
-                    <canvas id="dynamicAnalysisChart"></canvas>
-                </div>
-                <div class="mt-2 text-xs text-slate-500 text-center italic" id="chart-footer-text">
-                    Visualización automática basada en los filtros aplicados en la Sección III.
-                </div>
-            </section>
-
-            <!-- SECCIÓN IV: Costos Indirectos -->
+            <!-- SECCIÓN: GRÁFICA DINÁMICA (REMOVIDA DE ESTA VERSIÓN) -->
+            <!-- SECCIÓN IV: Costos Indirectos (MODIFICADA: SIN DÓLARES NI SIMULACIÓN) -->
             <section id="section-costos" class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                 <div class="flex flex-col lg:flex-row justify-between items-center mb-4 border-b pb-2 gap-4">
                     <h2 class="text-xl font-bold text-slate-700">IV. Estructura de Costos Indirectos</h2>
-                    
-                    <div class="flex items-center gap-2 bg-slate-50 p-1.5 rounded-lg border border-slate-200 shadow-sm opacity-90 hover:opacity-100 transition-opacity">
-                         <span class="text-[10px] text-slate-400 font-bold uppercase mr-1">Simular Item:</span>
-                         <select id="cost-book-select" class="text-xs border-none bg-transparent focus:ring-0 text-slate-600 font-semibold cursor-pointer outline-none max-w-[150px]">
-                            <option value="">Seleccionar Libro...</option>
-                        </select>
-                        <div class="h-4 w-px bg-slate-300 mx-1"></div>
-                        <input id="cost-search-input" type="text" placeholder="Código o nombre..." class="text-xs bg-transparent border-none focus:ring-0 outline-none w-32 text-slate-700">
-                        <button onclick="searchCostItem()" class="text-principal hover:text-blue-800 px-2 transition-colors">
-                            <i class="fas fa-calculator"></i>
-                        </button>
-                    </div>
                 </div>
 
-                <div id="cost-item-result" class="hidden mb-4 bg-blue-50 p-3 rounded-lg border border-blue-100 flex justify-between items-center text-sm animate-fade-in shadow-inner">
-                     <div class="flex items-center gap-3">
-                        <div class="bg-blue-100 text-blue-600 w-8 h-8 rounded-full flex items-center justify-center">
-                            <i class="fas fa-box"></i>
-                        </div>
-                        <div>
-                            <span class="font-bold text-blue-900 block" id="found-item-name">Nombre Producto</span>
-                            <span class="text-xs text-blue-600 font-mono" id="found-item-code">COD: 12345</span>
-                        </div>
-                     </div>
-                     <div class="text-right flex items-center gap-4">
-                        <div>
-                            <span class="text-[10px] text-blue-500 uppercase block font-bold">Costo Base Unitario</span>
-                            <span class="font-bold text-principal text-lg" id="found-item-price">$ 0</span>
-                        </div>
-                        <button onclick="clearCostSearch()" class="text-slate-400 hover:text-red-500 transition-colors" title="Limpiar y volver al general">
-                            <i class="fas fa-times-circle text-lg"></i>
-                        </button>
-                     </div>
-                </div>
+                <!-- Se eliminó el div #cost-item-result de simulación -->
 
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm text-left">
                         <thead class="text-xs text-white uppercase bg-principal">
                             <tr>
                                 <th class="px-4 py-3 rounded-tl-lg">Rubro</th>
-                                <th class="px-4 py-3 text-right">Porcentaje (%)</th>
-                                <th class="px-4 py-3 text-right rounded-tr-lg">Impacto ($)</th>
+                                <th class="px-4 py-3 text-right rounded-tr-lg">Porcentaje (%)</th>
                             </tr>
                         </thead>
                         <tbody id="cost-structure-body" class="divide-y divide-slate-100"></tbody>
@@ -437,12 +388,6 @@
                             <tr>
                                 <td class="px-4 py-3">TOTAL COSTO INDIRECTO</td>
                                 <td class="px-4 py-3 text-right text-terciario" id="total-indirect-percent">0.00%</td>
-                                <td class="px-4 py-3 text-right" id="total-indirect-value">$ 0</td>
-                            </tr>
-                            <tr class="bg-blue-50 text-blue-900 border-t-2 border-blue-200">
-                                <td class="px-4 py-3">COSTO TOTAL (Base + Indirectos)</td>
-                                <td class="px-4 py-3 text-right"></td>
-                                <td class="px-4 py-3 text-right font-extrabold text-lg" id="final-total-cost">$ 0</td>
                             </tr>
                         </tfoot>
                     </table>
@@ -475,11 +420,6 @@
                         <!-- BOTÓN DESCARGA EXCEL -->
                         <button onclick="downloadCharacterizationExcel()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow-sm text-xs font-bold flex items-center gap-2 transition-colors">
                             <i class="fas fa-file-excel"></i> Descargar Excel Completo (Con Cálculos)
-                        </button>
-
-                        <!-- BOTÓN DESCARGA PDF -->
-                        <button onclick="downloadCharacterizationPDF()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg shadow-sm text-xs font-bold flex items-center gap-2 transition-colors">
-                            <i class="fas fa-file-pdf"></i> Descargar PDF (Resumen con Encabezado)
                         </button>
                     </div>
                 </div>
@@ -574,16 +514,17 @@
         window.isProcessingFile = false;
         window.sheetsData = {};
         window.productGroups = [];
-        window.currentBaseCost = 1000000000;
-        let Logo_HUHMP_Blanco = "Logo_HUHMP_Blanco.png"; 
+        window.currentBaseCost = 0; // Ya no se usa base cost monetario para simulación
+        let Logo_HUHMP_Blanco = ""; 
         let currentPieMode = 'count';
-        let dynamicAnalysisChart = null;
+        // dynamicAnalysisChart eliminado
         let characterizationChart = null; // Chart Dona
         let characterizationBarChart = null; // Chart Barras
         let currentCategoryFilter = 'ALL';
         let currentParetoFilter = 'ALL';
         // Variable global para almacenar datos procesados para exportación
         let currentExportData = []; 
+        let consecutiveCounter = 1000; // Counter for PDF consecutive
 
         // Configuraciones Iniciales
         window.costStructure = [
@@ -600,10 +541,11 @@
         ];
 
         window.onload = () => {
+            initLogo();
             renderCostStructure();
             renderSignatures();
             initCharts();
-            initDynamicChart();
+            // initDynamicChart(); // ELIMINADO
             initCharacterizationCharts(); // Inicializar ambos charts de sección V
             window.refreshUI();
         };
@@ -621,51 +563,28 @@
             window.isProcessingFile = false;
             window.sheetsData = {};
             window.productGroups = [];
-            window.currentBaseCost = 1000000000;
+            window.currentBaseCost = 0;
             currentCategoryFilter = 'ALL';
             currentParetoFilter = 'ALL';
             
             document.getElementById('pharmacy-file-upload').value = "";
+             document.getElementById('Logo_HUHMP_Blanco_Input').value = "";
+            initLogo();
             
             if(paretoChart) { paretoChart.data.labels = []; paretoChart.data.datasets[0].data = []; paretoChart.update(); }
             if(pieChart) { pieChart.data.labels = []; pieChart.data.datasets[0].data = []; pieChart.update(); }
-            if(dynamicAnalysisChart) { 
-                dynamicAnalysisChart.data.labels = []; 
-                dynamicAnalysisChart.data.datasets = []; 
-                dynamicAnalysisChart.update(); 
-                document.getElementById('section-dynamic-analysis').classList.add('hidden');
-            }
+            
             // Reset nuevos charts
             if(characterizationChart) { characterizationChart.data.labels=[]; characterizationChart.data.datasets[0].data=[]; characterizationChart.update(); }
             if(characterizationBarChart) { characterizationBarChart.data.labels=[]; characterizationBarChart.data.datasets[0].data=[]; characterizationBarChart.update(); }
             document.getElementById('category-filters').innerHTML = ''; // Limpiar botones
 
             document.getElementById('book-detail-panel').classList.add('hidden');
-            document.getElementById('cost-item-result').classList.add('hidden');
             document.getElementById('inventory-search-input').value = "";
-            document.getElementById('cost-search-input').value = "";
             document.getElementById('upload-status-text').innerText = "Excel Multilibro (.xlsx, .xlsm)";
             document.getElementById('upload-status-text').className = "text-xs text-slate-500";
 
             window.refreshUI();
-        }
-
-        // --- CHART DINÁMICO ---
-        function initDynamicChart() {
-            const ctx = document.getElementById('dynamicAnalysisChart').getContext('2d');
-            dynamicAnalysisChart = new Chart(ctx, {
-                type: 'bar',
-                data: { labels: [], datasets: [] },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { position: 'top' },
-                        tooltip: { callbacks: { label: function(context) { let label = context.dataset.label || ''; if (label) { label += ': '; } if (context.parsed.y !== null) { label += new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' }).format(context.parsed.y); } return label; } } }
-                    },
-                    scales: { y: { beginAtZero: true, title: {display: true, text: 'Valor (COP)'} } }
-                }
-            });
         }
 
         function initCharacterizationCharts() {
@@ -709,49 +628,18 @@
             });
         }
 
-        function updateDynamicAnalysisChart(data) {
-            const section = document.getElementById('section-dynamic-analysis');
-            const badge = document.getElementById('chart-mode-badge');
-            if(!data || data.length === 0) { section.classList.add('hidden'); return; }
-            section.classList.remove('hidden');
-
-            if (data.length <= 20) {
-                badge.innerHTML = '<i class="fas fa-search-dollar mr-1"></i> Comparativo de Precios';
-                badge.className = "text-xs font-semibold px-2 py-1 rounded bg-green-100 text-green-800 border border-green-200";
-                const labels = data.map(row => { const desc = getColumnVal(row, ['descripción', 'descripcion']).toString(); return desc.length > 20 ? desc.substring(0, 20) + '...' : desc; });
-                const prices = data.map(row => cleanCurrency(getColumnVal(row, ['precio 2025'])));
-                const buyValues = data.map(row => cleanCurrency(getColumnVal(row, ['valor máximo', 'valor maximo'])));
-
-                dynamicAnalysisChart.data = {
-                    labels: labels,
-                    datasets: [
-                        { label: 'Precio 2025', data: prices, backgroundColor: 'rgba(49, 39, 130, 0.7)', borderColor: '#312782', borderWidth: 1 },
-                        { label: 'Valor Compra Máx.', data: buyValues, backgroundColor: 'rgba(0, 128, 65, 0.6)', borderColor: '#008041', borderWidth: 1 }
-                    ]
-                };
-            } else {
-                badge.innerHTML = '<i class="fas fa-chart-pie mr-1"></i> Valorización por Categoría';
-                badge.className = "text-xs font-semibold px-2 py-1 rounded bg-blue-100 text-blue-800 border border-blue-200";
-                const aggregatedValues = {};
-                data.forEach(row => {
-                    let cat = getColumnVal(row, ['pareto', 'páreto', 'clasificación']);
-                    cat = (cat || 'SIN CLASIFICAR').toString().trim().toUpperCase();
-                    if(cat === '') cat = 'SIN CLASIFICAR';
-                    const price = cleanCurrency(getColumnVal(row, ['precio 2025']));
-                    const units = parseFloat(getColumnVal(row, ['unidades', 'n° unidades'])) || 0;
-                    aggregatedValues[cat] = (aggregatedValues[cat] || 0) + (price * units);
-                });
-                const labels = Object.keys(aggregatedValues).sort();
-                const values = labels.map(k => aggregatedValues[k]);
-                dynamicAnalysisChart.data = {
-                    labels: labels,
-                    datasets: [{ label: 'Valor Total de Inventario', data: values, backgroundColor: ['#312782', '#008041', '#EC268F', '#fbbf24', '#60a5fa', '#94a3b8'], borderWidth: 1 }]
-                };
-            }
-            dynamicAnalysisChart.update();
-        }
-
         // --- HELPERS ---
+         function initLogo() {
+            const c = document.createElement('canvas'); c.width=200; c.height=200;
+            const x = c.getContext('2d'); x.fillStyle='#FFF'; x.beginPath();
+            x.moveTo(100,10); x.bezierCurveTo(200,10,200,100,100,190); x.bezierCurveTo(0,100,0,10,100,10); x.fill();
+            x.globalCompositeOperation='destination-out'; x.fillRect(80,50,40,100); x.fillRect(50,80,100,40);
+            Logo_HUHMP_Blanco = c.toDataURL();
+            document.getElementById('Logo_HUHMP_Blanco_Preview').src = Logo_HUHMP_Blanco;
+        }
+        function updateSpecificLogo(i){ if(i.files[0]){ const r=new FileReader(); r.onload=e=>{Logo_HUHMP_Blanco=e.target.result; document.getElementById('Logo_HUHMP_Blanco_Preview').src=Logo_HUHMP_Blanco;}; r.readAsDataURL(i.files[0]); } }
+
+
         function handlePharmacyFileUpload(event) {
             const file = event.target.files[0];
             const status = document.getElementById('upload-status-text');
@@ -822,7 +710,6 @@
 
             if (!sheetName || !window.sheetsData[sheetName]) {
                 tbody.innerHTML = '<tr><td colspan="11" class="px-4 py-8 text-center text-slate-400">Seleccione un libro válido.</td></tr>';
-                document.getElementById('section-dynamic-analysis').classList.add('hidden'); 
                 return;
             }
 
@@ -845,8 +732,6 @@
                     return paretoVal === paretoFilter;
                 });
             }
-
-            updateDynamicAnalysisChart(data);
 
             const displayData = data.slice(0, 500); 
 
@@ -915,16 +800,29 @@
             const select = document.getElementById('char-book-select');
             if(select.value !== sheetName && sheetName) select.value = sheetName;
 
-            if (!sheetName || !window.sheetsData[sheetName]) {
-                tbody.innerHTML = '<tr><td colspan="100%" class="px-4 py-8 text-center text-slate-400">Seleccione un libro válido para la caracterización.</td></tr>';
-                return;
+            let rawData = [];
+            // LÓGICA AGREGADA: Soporte para 'all'
+            if (sheetName === 'all') {
+                Object.values(window.sheetsData).forEach(arr => {
+                    rawData = rawData.concat(arr);
+                });
+            } else {
+                 if (!sheetName || !window.sheetsData[sheetName]) {
+                    tbody.innerHTML = '<tr><td colspan="100%" class="px-4 py-8 text-center text-slate-400">Seleccione un libro válido para la caracterización.</td></tr>';
+                    return;
+                }
+                rawData = window.sheetsData[sheetName];
+            }
+            
+            if (rawData.length === 0) {
+                 tbody.innerHTML = '<tr><td colspan="100%" class="px-4 py-8 text-center text-slate-400">No hay datos para visualizar.</td></tr>';
+                 return;
             }
 
-            const rawData = window.sheetsData[sheetName];
             const incrementPercent = parseFloat(document.getElementById('increment-percent').value) || 0;
             const totalIndirectPercent = window.costStructure.reduce((sum, item) => sum + item.percent, 0);
 
-            // 1. GENERAR CABECERAS DINÁMICAS
+            // 1. GENERAR CABECERAS DINÁMICAS (Usamos la fila 0, asumiendo consistencia)
             const firstRow = rawData[0];
             const originalHeaders = Object.keys(firstRow);
             
@@ -978,15 +876,17 @@
                 
                 if (desc && desc.toLowerCase().includes('regulado')) { category = "REGULADOS"; badgeClass = "bg-cat-regulados"; }
                 
-                // 4. TARIFA DE VENTA 2026
-                // "las tarifas de venta en la columna Tarifa Venta 2026 para los productos no regulados será la de precio 2026"
-                // Interpretación: 
-                // REGULADOS: Mantienen Precio 2025.
-                // NO REGULADOS: Precio 2026 (Precio 2025 + Incremento)
+                // 4. TARIFA DE VENTA 2026 - LÓGICA SOLICITADA
+                // REGULADOS: Mantienen Precio 2025 (No hay incremento).
+                // NO REGULADOS: Precio 2025 + Incremento % (Esto es lo que llamamos Precio 2026)
+                // El usuario pidió: "Tarifa Venta 2026 ... será la misma información de la columna de precio 2026".
+                // Asumimos Precio 2026 = Precio 2025 * (1 + Incremento)
+                const precio2026Calculado = precio2025 * (1 + (incrementPercent / 100));
+
                 if (category === "REGULADOS") {
                     tarifaVenta2026 = precio2025; // Regulado no sube
                 } else {
-                    tarifaVenta2026 = precio2025 * (1 + (incrementPercent / 100)); // Precio 2026 proyectado
+                    tarifaVenta2026 = precio2026Calculado; // No regulado sube
                 }
 
                 if (categoryCounts.hasOwnProperty(category)) {
@@ -1159,12 +1059,11 @@
         function populateSelectors() {
             const paretoSelect = document.getElementById('pareto-book-select');
             const invSelect = document.getElementById('inventory-book-select');
-            const costSelect = document.getElementById('cost-book-select'); 
+            // costSelect eliminado
             const charSelect = document.getElementById('char-book-select'); 
             
             const currPareto = paretoSelect.value;
             const currInv = invSelect.value;
-            const currCost = costSelect.value;
             const currChar = charSelect.value;
 
             let opts = '<option value="">Seleccione...</option>';
@@ -1177,8 +1076,7 @@
 
             invSelect.innerHTML = opts;
             paretoSelect.innerHTML = paretoOpts;
-            costSelect.innerHTML = opts; 
-            charSelect.innerHTML = opts;
+            charSelect.innerHTML = paretoOpts; // AHORA INCLUYE 'CONSOLIDADO GENERAL' (all)
 
             if(window.productGroups.length > 0) {
                 if(!currInv) invSelect.value = window.productGroups[0].name;
@@ -1186,7 +1084,6 @@
             }
             if(currInv) invSelect.value = currInv;
             if(currPareto) paretoSelect.value = currPareto;
-            if(currCost) costSelect.value = currCost;
             if(currChar) charSelect.value = currChar;
             
             if(invSelect.value) renderInventoryTable(invSelect.value);
@@ -1194,50 +1091,8 @@
             if(charSelect.value && window.sheetsData[charSelect.value]) renderCharacterizationTable(charSelect.value);
         }
 
-        window.searchCostItem = function() {
-            const sheetName = document.getElementById('cost-book-select').value;
-            const query = document.getElementById('cost-search-input').value.toLowerCase().trim();
-            const resultDiv = document.getElementById('cost-item-result');
-
-            if (!sheetName || !window.sheetsData[sheetName]) {
-                alert("Por favor seleccione un libro válido para buscar.");
-                return;
-            }
-            if (!query) return;
-
-            const data = window.sheetsData[sheetName];
-            
-            const found = data.find(row => {
-                const codigo = getColumnVal(row, ['código', 'codigo', 'producto']).toString().toLowerCase();
-                const desc = getColumnVal(row, ['descripción', 'descripcion']).toString().toLowerCase();
-                return codigo.includes(query) || desc.includes(query);
-            });
-
-            if (found) {
-                const name = getColumnVal(found, ['descripción', 'descripcion']);
-                const code = getColumnVal(found, ['código', 'codigo', 'producto']);
-                const price = cleanCurrency(getColumnVal(found, ['precio 2025']));
-
-                document.getElementById('found-item-name').innerText = name || "Sin Nombre";
-                document.getElementById('found-item-code').innerText = `COD: ${code || 'N/A'}`;
-                document.getElementById('found-item-price').innerText = formatMoney(price);
-
-                resultDiv.classList.remove('hidden');
-                
-                window.currentBaseCost = price; 
-                renderCostStructure();
-            } else {
-                alert("No se encontró ningún ítem con ese criterio.");
-                clearCostSearch();
-            }
-        }
-
-        window.clearCostSearch = function() {
-            document.getElementById('cost-search-input').value = "";
-            document.getElementById('cost-item-result').classList.add('hidden');
-            window.currentBaseCost = 1000000000;
-            renderCostStructure();
-        }
+        // searchCostItem eliminado
+        // clearCostSearch eliminado
 
         function analyzeSheetSummary(data) {
             let totalCost = 0;
@@ -1378,25 +1233,17 @@
 
         function renderCostStructure() {
             const tbody = document.getElementById('cost-structure-body');
-            let totalIndirectVal = 0;
             let totalPercent = 0;
-
-            const baseAmount = window.currentBaseCost; 
 
             tbody.innerHTML = window.costStructure.map((i, idx) => {
                 totalPercent += i.percent;
-                const val = baseAmount * (i.percent / 100);
-                totalIndirectVal += val;
-                
                 return `
                 <tr><td class="px-4 py-2 text-slate-700">${i.name}</td>
-                <td class="px-4 py-2 text-right"><input type="number" value="${i.percent}" onchange="updateCost(${idx}, this.value)" class="table-input w-20 text-right"> %</td>
-                <td class="px-4 py-2 text-right text-xs text-slate-500">${formatMoney(val)}</td></tr>
+                <td class="px-4 py-2 text-right"><input type="number" id="cost-input-${idx}" value="${i.percent}" onchange="updateCost(${idx}, this.value)" class="table-input w-20 text-right"> %</td>
+                </tr>
             `}).join('');
 
             document.getElementById('total-indirect-percent').innerText = totalPercent.toFixed(2) + "%";
-            document.getElementById('total-indirect-value').innerText = formatMoney(totalIndirectVal);
-            document.getElementById('final-total-cost').innerText = formatMoney(baseAmount + totalIndirectVal);
         }
 
         window.updateCost = (i,v) => { window.costStructure[i].percent = parseFloat(v)||0; renderCostStructure(); if(window.saveDataToFirebase) window.saveDataToFirebase(); };
@@ -1404,9 +1251,9 @@
         function renderSignatures() {
             document.getElementById('signatures-body').innerHTML = window.signatures.map((s, idx) => `
                 <tr>
-                    <td class="p-2"><input value="${s.role}" onchange="upSig(${idx},'role',this.value)" class="table-input"></td>
-                    <td class="p-2"><input value="${s.name}" onchange="upSig(${idx},'name',this.value)" class="table-input"></td>
-                    <td class="p-2"><input value="${s.cargo}" onchange="upSig(${idx},'cargo',this.value)" class="table-input"></td>
+                    <td class="p-2"><input id="sig-role-${idx}" value="${s.role}" onchange="upSig(${idx},'role',this.value)" class="table-input"></td>
+                    <td class="p-2"><input id="sig-name-${idx}" value="${s.name}" onchange="upSig(${idx},'name',this.value)" class="table-input"></td>
+                    <td class="p-2"><input id="sig-cargo-${idx}" value="${s.cargo}" onchange="upSig(${idx},'cargo',this.value)" class="table-input"></td>
                     <td class="p-2 text-center"><button onclick="rmSig(${idx})" class="text-red-500"><i class="fas fa-trash"></i></button></td>
                 </tr>
             `).join('');
@@ -1414,81 +1261,209 @@
         window.upSig = (i,f,v) => { window.signatures[i][f]=v; if(window.saveDataToFirebase) window.saveDataToFirebase(); };
         window.addSignature = () => { window.signatures.push({role:'REVISÓ',name:'',cargo:''}); renderSignatures(); if(window.saveDataToFirebase) window.saveDataToFirebase(); };
         window.rmSig = (i) => { if(confirm('¿Borrar?')){ window.signatures.splice(i,1); renderSignatures(); if(window.saveDataToFirebase) window.saveDataToFirebase(); } };
-    
-    // ------------------------------------------------------------
-    // DESCARGA DE PDF CON ENCABEZADO INSTITUCIONAL
-    // ------------------------------------------------------------
-    async function downloadCharacterizationPDF() {
-        if (!window.jspdf) {
-            alert("No se pudo cargar la librería jsPDF.");
-            return;
-        }
 
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF("p", "mm", "letter");
-        let y = 12;
-
-        // 1. Encabezado con LOGO + Títulos
-        try {
-            const img = new Image();
-            img.src = Logo_HUHMP_Blanco || "Logo_HUHMP_Blanco.png";
-            await img.decode();
-            doc.addImage(img, "PNG", 10, 8, 35, 14);
-        } catch (e) {
-            console.warn("No se pudo cargar el logo para el PDF:", e);
-        }
-
-        doc.setFontSize(9);
-        doc.setFont("helvetica", "bold");
-        doc.text("FORMULARIO DE TARIFAS FARMACÉUTICAS", 55, y);
-        doc.setFont("helvetica", "normal");
-        doc.text("ESE Hospital Universitario Hernando Moncaleano Perdomo", 55, y + 5);
-        doc.text("Neiva - Huila", 55, y + 10);
-
-        const fechaStr = new Date().toLocaleString("es-CO");
-        doc.text("Fecha de generación: " + fechaStr, 55, y + 15);
-
-        y = 35;
-
-        if (!window.currentExportData || window.currentExportData.length === 0) {
-            doc.setFontSize(10);
-            doc.text("No hay datos disponibles para exportar. Primero genere la caracterización.", 10, y);
-            doc.save("Tarifas_Farmaceuticas.pdf");
-            return;
-        }
-
-        const headers = Object.keys(window.currentExportData[0]);
-        const colWidth = 180 / headers.length;
-
-        doc.setFontSize(8);
-        doc.setFont("helvetica", "bold");
-
-        headers.forEach((h, idx) => {
-            const texto = String(h).substring(0, 30);
-            doc.text(texto, 10 + idx * colWidth, y);
-        });
-
-        y += 5;
-        doc.setFont("helvetica", "normal");
-
-        window.currentExportData.forEach(row => {
-            if (y > 265) {
-                doc.addPage();
-                y = 20;
-            }
-
-            headers.forEach((h, idx) => {
-                const cellValue = row[h] == null ? "" : String(row[h]);
-                const texto = cellValue.substring(0, 30);
-                doc.text(texto, 10 + idx * colWidth, y);
+        window.generatePDF = () => {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4'
             });
 
-            y += 4;
-        });
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            consecutiveCounter++;
+            const consecutive = String(consecutiveCounter).padStart(6, '0');
+            const currentDate = new Date().toLocaleString();
 
-        doc.save("Tarifas_Farmaceuticas.pdf");
-    }
+            // Función Helper para el Header
+            const drawHeader = () => {
+                // Franja Azul Institucional
+                doc.setFillColor(49, 39, 130); // #312782
+                doc.rect(0, 0, pageWidth, 35, 'F');
+                
+                // Logo
+                if(Logo_HUHMP_Blanco) {
+                    try { doc.addImage(Logo_HUHMP_Blanco, 'PNG', 10, 5, 25, 25); } catch(e){}
+                }
 
-</script>
+                // Títulos en Blanco
+                doc.setTextColor(255, 255, 255);
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(18);
+                doc.text("FORMULARIO DE COSTEO UNITARIO", pageWidth / 2, 18, { align: 'center' });
+                
+                doc.setFontSize(10);
+                doc.setFont("helvetica", "normal");
+                doc.text("ESE Hospital Universitario Hernando Moncaleano Perdomo de Neiva", pageWidth / 2, 25, { align: 'center' });
+            };
+
+            drawHeader();
+
+            let y = 45;
+
+            // TABLA 1: Estructura de Costos Indirectos (MODIFICADA: SIN DÓLARES)
+            doc.setTextColor(49, 39, 130);
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "bold");
+            doc.text("ESTRUCTURA DE COSTOS INDIRECTOS (PORCENTAJES)", 15, y);
+            y += 2;
+
+            // Capturar datos frescos de los inputs
+            const costBody = window.costStructure.map((c, i) => {
+                let currentPercent = c.percent;
+                const inputEl = document.getElementById(`cost-input-${i}`);
+                if(inputEl) currentPercent = parseFloat(inputEl.value) || 0;
+                return [c.name, currentPercent + " %"];
+            });
+            
+            // Totales
+            let totalIndP = window.costStructure.reduce((a,b) => a + b.percent, 0);
+            
+            costBody.push(['TOTAL COSTOS INDIRECTOS', totalIndP.toFixed(2) + " %"]);
+            // Se eliminó la fila de Costo Total Unitario
+
+            doc.autoTable({
+                startY: y,
+                head: [['Rubro', 'Porcentaje']],
+                body: costBody,
+                theme: 'grid',
+                headStyles: { fillColor: [49, 39, 130], textColor: 255, fontStyle: 'bold', halign: 'center' },
+                bodyStyles: { textColor: 50 },
+                columnStyles: { 
+                    1: { halign: 'right' }
+                },
+                didParseCell: function(data) {
+                    // Negrita para la última fila
+                    if (data.row.index === costBody.length - 1) {
+                        data.cell.styles.fontStyle = 'bold';
+                        data.cell.styles.fillColor = [240, 248, 255]; 
+                        data.cell.styles.textColor = [49, 39, 130];
+                    }
+                }
+            });
+
+            y = doc.lastAutoTable.finalY + 20;
+
+            // TABLA 2: Firmas
+            doc.setTextColor(49, 39, 130);
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "bold");
+            doc.text("APROBACIONES Y FIRMAS", 15, y);
+            y += 2;
+
+            // Capturar datos frescos de firmas
+            const sigBody = window.signatures.map((s, i) => {
+                const r = document.getElementById(`sig-role-${i}`)?.value || s.role;
+                const n = document.getElementById(`sig-name-${i}`)?.value || s.name;
+                const c = document.getElementById(`sig-cargo-${i}`)?.value || s.cargo;
+                return [r, n, c];
+            });
+
+            doc.autoTable({
+                startY: y,
+                head: [['Rol', 'Nombre', 'Cargo']],
+                body: sigBody,
+                theme: 'grid',
+                headStyles: { fillColor: [49, 39, 130], textColor: 255, fontStyle: 'bold' },
+                styles: { fontSize: 10, cellPadding: 4 }
+            });
+
+            // PIE DE PÁGINA (Paginación + Consecutivo + Fecha)
+            const pageCount = doc.internal.getNumberOfPages();
+            for(let i = 1; i <= pageCount; i++) {
+                doc.setPage(i);
+                
+                // Línea separadora
+                doc.setDrawColor(200);
+                doc.line(10, pageHeight - 15, pageWidth - 10, pageHeight - 15);
+                
+                doc.setFontSize(8);
+                doc.setTextColor(100);
+                
+                // Izquierda: Fecha
+                doc.text(`Generado: ${currentDate}`, 15, pageHeight - 10);
+                
+                // Centro: Paginación
+                doc.text(`Página ${i} de ${pageCount}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+                
+                // Derecha: Consecutivo
+                doc.text(`Consecutivo: ${consecutive}`, pageWidth - 15, pageHeight - 10, { align: 'right' });
+            }
+
+            doc.save(`Costeo_Unitario_${consecutive}.pdf`);
+        }
+
+        // --- LÓGICA DE DESCARGA PDF DE CARACTERIZACIÓN (SECCIÓN V) ---
+        // Se mantiene la función en caso de requerirse en el futuro, aunque no haya botón visible.
+        async function downloadCharacterizationPDF() {
+            if (!window.jspdf) { alert("No se pudo cargar la librería jsPDF."); return; }
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF("p", "mm", "letter");
+            let y = 12;
+
+            try {
+                const img = new Image();
+                img.src = Logo_HUHMP_Blanco || "Logo_HUHMP_Blanco.png"; 
+                if(Logo_HUHMP_Blanco) doc.addImage(img, "PNG", 10, 8, 35, 14);
+            } catch (e) { console.warn("No logo loaded", e); }
+
+            doc.setFontSize(9);
+            doc.setFont("helvetica", "bold");
+            doc.text("FORMULARIO DE TARIFAS FARMACÉUTICAS", 55, y);
+            doc.setFont("helvetica", "normal");
+            doc.text("ESE Hospital Universitario Hernando Moncaleano Perdomo", 55, y + 5);
+            doc.text("Neiva - Huila", 55, y + 10);
+            const fechaStr = new Date().toLocaleString("es-CO");
+            doc.text("Fecha de generación: " + fechaStr, 55, y + 15);
+
+            y = 35;
+
+            if (!window.currentExportData || window.currentExportData.length === 0) {
+                doc.setFontSize(10);
+                doc.text("No hay datos disponibles para exportar. Primero genere la caracterización.", 10, y);
+                doc.save("Tarifas_Farmaceuticas.pdf");
+                return;
+            }
+
+            const keysToPrint = ['código', 'descripción', 'precio 2025', '_costoTotal', '_tarifaVenta2026', '_category'];
+            const headers = ["Cód", "Descripción", "Precio 25", "Costo Tot", "Tarifa 26", "Categoría"];
+            const colWidths = [20, 60, 25, 25, 25, 35];
+            
+            doc.setFontSize(7);
+            doc.setFont("helvetica", "bold");
+            
+            let x = 10;
+            headers.forEach((h, i) => {
+                doc.text(h, x, y);
+                x += colWidths[i];
+            });
+            
+            y += 5;
+            doc.setFont("helvetica", "normal");
+
+            window.currentExportData.forEach(row => {
+                if (y > 260) { doc.addPage(); y = 20; }
+                
+                x = 10;
+                const vals = [
+                    getColumnVal(row, ['código', 'codigo']),
+                    getColumnVal(row, ['descripción', 'descripcion']).substring(0, 35),
+                    formatMoney(cleanCurrency(getColumnVal(row, ['precio 2025']))),
+                    formatMoney(row._costoTotal),
+                    formatMoney(row._tarifaVenta2026),
+                    row._category.substring(0, 20)
+                ];
+
+                vals.forEach((v, i) => {
+                    doc.text(String(v), x, y);
+                    x += colWidths[i];
+                });
+                y += 4;
+            });
+
+            doc.save("Resumen_Tarifas_2026.pdf");
+        }
+    </script>
 </body>
 </html>
