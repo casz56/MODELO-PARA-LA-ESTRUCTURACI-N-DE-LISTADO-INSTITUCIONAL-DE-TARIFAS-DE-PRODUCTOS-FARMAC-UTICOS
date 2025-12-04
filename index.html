@@ -20,7 +20,11 @@
     <!-- SheetJS (Excel) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-    <!-- Firebase SDKs -->
+    
+    <!-- jsPDF para generación de PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" integrity="sha512-Xc2Q4o+RiwqYV1OZ9jW6r8MxxlI9iEiVYPyF9Whp5k0D8NOYht7dw/d5L6vG0xvTWWKJpAkM5sUu1bF37VQm4g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+<!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -175,16 +179,30 @@
     <div class="max-w-7xl mx-auto space-y-6 flex-grow">
         
         <!-- ENCABEZADO -->
-        <header class="bg-principal text-white p-6 rounded-xl shadow-lg flex flex-col md:flex-row justify-between items-center gap-4 relative overflow-hidden">
+                <header class="bg-principal text-white p-6 rounded-xl shadow-lg flex flex-col md:flex-row justify-between items-center gap-4 relative overflow-hidden">
             <div class="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-16 -mt-16 pointer-events-none"></div>
-            
+
             <div class="flex items-center gap-4 z-10 w-full md:w-auto">
+                <!-- LOGO INSTITUCIONAL -->
+                <img 
+                    src="Logo_HUHMP_Blanco.png" 
+                    alt="ESE Hospital Universitario Hernando Moncaleano Perdomo"
+                    class="h-12 w-auto hidden sm:block"
+                >
                 <div class="flex-grow pl-2">
-                    <h1 class="text-2xl md:text-3xl font-bold leading-tight">Modelo de Tarifas Farmacéuticas</h1>
-                    <p class="text-blue-200 text-sm md:text-base">ESE Hospital Universitario Hernando Moncaleano Perdomo</p>
+                    <h1 class="text-2xl md:text-3xl font-bold leading-tight">
+                        Modelo de Tarifas Farmacéuticas
+                    </h1>
+                    <p class="text-blue-200 text-sm md:text-base">
+                        ESE Hospital Universitario Hernando Moncaleano Perdomo
+                    </p>
                     <div class="flex items-center justify-between mt-1">
-                        <span class="text-xs bg-blue-800 px-2 py-0.5 rounded text-blue-100 border border-blue-700 font-mono">GD-SGI-M-005 | Vigencia 2026</span>
-                        <div id="db-status" class="text-[0.7rem] bg-black/20 px-2 rounded-full ml-4 inline-block"><i class="fas fa-circle-notch fa-spin"></i> Conectando...</div>
+                        <span class="text-xs bg-blue-800 px-2 py-0.5 rounded text-blue-100 border border-blue-700 font-mono">
+                            GD-SGI-M-005 | Vigencia 2026
+                        </span>
+                        <div id="db-status" class="text-[0.7rem] bg-black/20 px-2 rounded-full ml-4 inline-block">
+                            <i class="fas fa-circle-notch fa-spin"></i> Conectando...
+                        </div>
                     </div>
                 </div>
             </div>
@@ -458,6 +476,11 @@
                         <button onclick="downloadCharacterizationExcel()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow-sm text-xs font-bold flex items-center gap-2 transition-colors">
                             <i class="fas fa-file-excel"></i> Descargar Excel Completo (Con Cálculos)
                         </button>
+
+                        <!-- BOTÓN DESCARGA PDF -->
+                        <button onclick="downloadCharacterizationPDF()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg shadow-sm text-xs font-bold flex items-center gap-2 transition-colors">
+                            <i class="fas fa-file-pdf"></i> Descargar PDF (Resumen con Encabezado)
+                        </button>
                     </div>
                 </div>
 
@@ -552,7 +575,7 @@
         window.sheetsData = {};
         window.productGroups = [];
         window.currentBaseCost = 1000000000;
-        let Logo_HUHMP_Blanco = ""; 
+        let Logo_HUHMP_Blanco = "Logo_HUHMP_Blanco.png"; 
         let currentPieMode = 'count';
         let dynamicAnalysisChart = null;
         let characterizationChart = null; // Chart Dona
@@ -1391,6 +1414,81 @@
         window.upSig = (i,f,v) => { window.signatures[i][f]=v; if(window.saveDataToFirebase) window.saveDataToFirebase(); };
         window.addSignature = () => { window.signatures.push({role:'REVISÓ',name:'',cargo:''}); renderSignatures(); if(window.saveDataToFirebase) window.saveDataToFirebase(); };
         window.rmSig = (i) => { if(confirm('¿Borrar?')){ window.signatures.splice(i,1); renderSignatures(); if(window.saveDataToFirebase) window.saveDataToFirebase(); } };
-    </script>
+    
+    // ------------------------------------------------------------
+    // DESCARGA DE PDF CON ENCABEZADO INSTITUCIONAL
+    // ------------------------------------------------------------
+    async function downloadCharacterizationPDF() {
+        if (!window.jspdf) {
+            alert("No se pudo cargar la librería jsPDF.");
+            return;
+        }
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF("p", "mm", "letter");
+        let y = 12;
+
+        // 1. Encabezado con LOGO + Títulos
+        try {
+            const img = new Image();
+            img.src = Logo_HUHMP_Blanco || "Logo_HUHMP_Blanco.png";
+            await img.decode();
+            doc.addImage(img, "PNG", 10, 8, 35, 14);
+        } catch (e) {
+            console.warn("No se pudo cargar el logo para el PDF:", e);
+        }
+
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        doc.text("FORMULARIO DE TARIFAS FARMACÉUTICAS", 55, y);
+        doc.setFont("helvetica", "normal");
+        doc.text("ESE Hospital Universitario Hernando Moncaleano Perdomo", 55, y + 5);
+        doc.text("Neiva - Huila", 55, y + 10);
+
+        const fechaStr = new Date().toLocaleString("es-CO");
+        doc.text("Fecha de generación: " + fechaStr, 55, y + 15);
+
+        y = 35;
+
+        if (!window.currentExportData || window.currentExportData.length === 0) {
+            doc.setFontSize(10);
+            doc.text("No hay datos disponibles para exportar. Primero genere la caracterización.", 10, y);
+            doc.save("Tarifas_Farmaceuticas.pdf");
+            return;
+        }
+
+        const headers = Object.keys(window.currentExportData[0]);
+        const colWidth = 180 / headers.length;
+
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "bold");
+
+        headers.forEach((h, idx) => {
+            const texto = String(h).substring(0, 30);
+            doc.text(texto, 10 + idx * colWidth, y);
+        });
+
+        y += 5;
+        doc.setFont("helvetica", "normal");
+
+        window.currentExportData.forEach(row => {
+            if (y > 265) {
+                doc.addPage();
+                y = 20;
+            }
+
+            headers.forEach((h, idx) => {
+                const cellValue = row[h] == null ? "" : String(row[h]);
+                const texto = cellValue.substring(0, 30);
+                doc.text(texto, 10 + idx * colWidth, y);
+            });
+
+            y += 4;
+        });
+
+        doc.save("Tarifas_Farmaceuticas.pdf");
+    }
+
+</script>
 </body>
 </html>
