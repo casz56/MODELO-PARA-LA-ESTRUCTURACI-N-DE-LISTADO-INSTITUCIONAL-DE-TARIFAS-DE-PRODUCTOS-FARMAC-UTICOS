@@ -206,8 +206,8 @@
                 <button onclick="resetApp()" class="bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded-lg shadow-md transition-colors flex items-center justify-center font-semibold text-xs ring-1 ring-slate-500 w-full" title="Borrar datos y reiniciar">
                     <i class="fas fa-undo mr-2"></i> Restablecer
                 </button>
-                 <button onclick="generatePDF()" class="bg-secundario hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow-md transition-colors flex items-center justify-center font-semibold text-xs ring-1 ring-green-600 w-full">
-                    <i class="fas fa-file-invoice mr-2"></i> Descargar PDF
+                 <button onclick="generateFullReport()" class="bg-secundario hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow-md transition-colors flex items-center justify-center font-semibold text-xs ring-1 ring-green-600 w-full">
+                    <i class="fas fa-file-pdf mr-2"></i> Informe Completo
                 </button>
             </div>
         </header>
@@ -1291,211 +1291,344 @@
         window.addSignature = () => { window.signatures.push({role:'REVISÓ',name:'',cargo:''}); renderSignatures(); if(window.saveDataToFirebase) window.saveDataToFirebase(); };
         window.rmSig = (i) => { if(confirm('¿Borrar?')){ window.signatures.splice(i,1); renderSignatures(); if(window.saveDataToFirebase) window.saveDataToFirebase(); } };
 
-        window.generatePDF = () => {
+        // --- GENERACIÓN DE REPORTE COMPLETO PDF ---
+        window.generateFullReport = async () => {
             const { jsPDF } = window.jspdf;
-            const doc = new jsPDF({
-                orientation: 'portrait',
-                unit: 'mm',
-                format: 'a4'
-            });
-
+            const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+            
             const pageWidth = doc.internal.pageSize.getWidth();
             const pageHeight = doc.internal.pageSize.getHeight();
+            const margins = { top: 35, bottom: 20, left: 15, right: 15 };
+            
             consecutiveCounter++;
             const consecutive = String(consecutiveCounter).padStart(6, '0');
-            const currentDate = new Date().toLocaleString();
+            const currentDate = new Date().toLocaleString("es-CO");
 
-            // Función Helper para el Header
-            const drawHeader = () => {
-                // Franja Azul Institucional
-                doc.setFillColor(49, 39, 130); // #312782
-                doc.rect(0, 0, pageWidth, 35, 'F');
+            // --- HELPER: HEADER ---
+            const drawHeader = (doc) => {
+                // Fondo Azul Institucional
+                doc.setFillColor(49, 39, 130); 
+                doc.rect(0, 0, pageWidth, 28, 'F');
                 
                 // Logo
                 if(Logo_HUHMP_Blanco) {
-                    try { doc.addImage(Logo_HUHMP_Blanco, 'PNG', 10, 5, 25, 25); } catch(e){}
+                    try { doc.addImage(Logo_HUHMP_Blanco, 'PNG', 10, 4, 20, 20); } catch(e){}
                 }
 
-                // Títulos en Blanco
+                // Títulos
                 doc.setTextColor(255, 255, 255);
                 doc.setFont("helvetica", "bold");
-                doc.setFontSize(18);
-                doc.text("FORMULARIO DE COSTEO UNITARIO", pageWidth / 2, 18, { align: 'center' });
+                doc.setFontSize(14);
+                doc.text("INFORME TÉCNICO DE TARIFAS FARMACÉUTICAS 2026", 40, 12);
                 
-                doc.setFontSize(10);
+                doc.setFontSize(9);
                 doc.setFont("helvetica", "normal");
-                doc.text("ESE Hospital Universitario Hernando Moncaleano Perdomo de Neiva", pageWidth / 2, 25, { align: 'center' });
+                doc.text("ESE Hospital Universitario Hernando Moncaleano Perdomo", 40, 18);
+                doc.text("Código: GD-SGI-M-005 | Versión: 01", 40, 23);
             };
 
-            drawHeader();
-
-            let y = 45;
-
-            // TABLA 1: Estructura de Costos Indirectos (MODIFICADA: SIN DÓLARES)
-            doc.setTextColor(49, 39, 130);
-            doc.setFontSize(12);
-            doc.setFont("helvetica", "bold");
-            doc.text("ESTRUCTURA DE COSTOS INDIRECTOS (PORCENTAJES)", 15, y);
-            y += 2;
-
-            // Capturar datos frescos de los inputs
-            const costBody = window.costStructure.map((c, i) => {
-                let currentPercent = c.percent;
-                const inputEl = document.getElementById(`cost-input-${i}`);
-                if(inputEl) currentPercent = parseFloat(inputEl.value) || 0;
-                return [c.name, currentPercent + " %"];
-            });
-            
-            // Totales
-            let totalIndP = window.costStructure.reduce((a,b) => a + b.percent, 0);
-            
-            costBody.push(['TOTAL COSTOS INDIRECTOS', totalIndP.toFixed(2) + " %"]);
-            // Se eliminó la fila de Costo Total Unitario
-
-            doc.autoTable({
-                startY: y,
-                head: [['Rubro', 'Porcentaje']],
-                body: costBody,
-                theme: 'grid',
-                headStyles: { fillColor: [49, 39, 130], textColor: 255, fontStyle: 'bold', halign: 'center' },
-                bodyStyles: { textColor: 50 },
-                columnStyles: { 
-                    1: { halign: 'right' }
-                },
-                didParseCell: function(data) {
-                    // Negrita para la última fila
-                    if (data.row.index === costBody.length - 1) {
-                        data.cell.styles.fontStyle = 'bold';
-                        data.cell.styles.fillColor = [240, 248, 255]; 
-                        data.cell.styles.textColor = [49, 39, 130];
-                    }
-                }
-            });
-
-            y = doc.lastAutoTable.finalY + 20;
-
-            // TABLA 2: Firmas
-            doc.setTextColor(49, 39, 130);
-            doc.setFontSize(12);
-            doc.setFont("helvetica", "bold");
-            doc.text("APROBACIONES Y FIRMAS", 15, y);
-            y += 2;
-
-            // Capturar datos frescos de firmas
-            const sigBody = window.signatures.map((s, i) => {
-                const r = document.getElementById(`sig-role-${i}`)?.value || s.role;
-                const n = document.getElementById(`sig-name-${i}`)?.value || s.name;
-                const c = document.getElementById(`sig-cargo-${i}`)?.value || s.cargo;
-                return [r, n, c];
-            });
-
-            doc.autoTable({
-                startY: y,
-                head: [['Rol', 'Nombre', 'Cargo']],
-                body: sigBody,
-                theme: 'grid',
-                headStyles: { fillColor: [49, 39, 130], textColor: 255, fontStyle: 'bold' },
-                styles: { fontSize: 10, cellPadding: 4 }
-            });
-
-            // PIE DE PÁGINA (Paginación + Consecutivo + Fecha)
-            const pageCount = doc.internal.getNumberOfPages();
-            for(let i = 1; i <= pageCount; i++) {
-                doc.setPage(i);
-                
-                // Línea separadora
+            // --- HELPER: FOOTER ---
+            const drawFooter = (doc, pageNum, pageCount) => {
                 doc.setDrawColor(200);
                 doc.line(10, pageHeight - 15, pageWidth - 10, pageHeight - 15);
-                
+                doc.setFontSize(7);
+                doc.setTextColor(100);
+                doc.text(`Generado: ${currentDate}`, 15, pageHeight - 10);
+                doc.text(`Página ${pageNum} de ${pageCount}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+                doc.text(`Consecutivo: ${consecutive}`, pageWidth - 15, pageHeight - 10, { align: 'right' });
+            };
+
+            // --- INICIO DOCUMENTO ---
+            let currentY = margins.top;
+
+            // 1. TÍTULO DEL REPORTE
+            drawHeader(doc);
+            doc.setTextColor(49, 39, 130);
+            doc.setFontSize(16);
+            doc.setFont("helvetica", "bold");
+            doc.text("ANÁLISIS ESTRUCTURAL DE COSTOS Y TARIFAS", margins.left, currentY);
+            currentY += 10;
+            
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(50);
+            doc.text("El presente documento detalla la metodología, análisis de datos y proyección tarifaria para la vigencia 2026, conforme a los lineamientos institucionales y regulatorios.", margins.left, currentY, { maxWidth: pageWidth - 30 });
+            currentY += 15;
+
+            // --- SECCIÓN I: RESUMEN DE PRODUCTOS ---
+            doc.setFillColor(240, 240, 245);
+            doc.rect(margins.left, currentY - 5, pageWidth - 30, 8, 'F');
+            doc.setTextColor(49, 39, 130);
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(11);
+            doc.text("I. RESUMEN DE PRODUCTOS POR TIPO", margins.left + 2, currentY);
+            currentY += 5;
+
+            const summaryBody = window.productGroups.map(g => [
+                g.name, 
+                g.count, 
+                formatMoney(g.cost), 
+                formatMoney(g.revenue)
+            ]);
+
+            doc.autoTable({
+                startY: currentY,
+                head: [['Libro / Fuente', 'Cant. Ítems', 'Costo Total Inventario', 'Venta Proyectada']],
+                body: summaryBody,
+                theme: 'striped',
+                headStyles: { fillColor: [49, 39, 130], textColor: 255, fontSize: 8 },
+                bodyStyles: { fontSize: 8 },
+                columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' } },
+                margin: { left: margins.left, right: margins.right }
+            });
+            currentY = doc.lastAutoTable.finalY + 15;
+
+            // --- SECCIÓN II: PARETO ---
+            doc.setFillColor(240, 240, 245);
+            doc.rect(margins.left, currentY - 5, pageWidth - 30, 8, 'F');
+            doc.setTextColor(49, 39, 130);
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(11);
+            doc.text("II. ANÁLISIS DE PARETO", margins.left + 2, currentY);
+            currentY += 10;
+
+            // Capturar Gráfica Pareto (si existe)
+            try {
+                const canvas = document.getElementById('paretoChart');
+                if (canvas) {
+                    const imgData = canvas.toDataURL('image/png');
+                    // Ajustar tamaño para que quepa
+                    const imgWidth = 120; 
+                    const imgHeight = 60;
+                    doc.addImage(imgData, 'PNG', margins.left, currentY, imgWidth, imgHeight);
+                    
+                    // Tabla Resumen Pareto al lado
+                    const paretoSummary = [];
+                    // Calcular resumen rápido de todos los datos
+                    let counts = {A:0, B:0, C:0};
+                    Object.values(window.sheetsData).forEach(sheet => {
+                        sheet.forEach(row => {
+                            let p = getColumnVal(row, ['pareto', 'páreto']);
+                            if(p) {
+                                p = p.toString().toUpperCase().trim();
+                                if(counts[p] !== undefined) counts[p]++;
+                            }
+                        });
+                    });
+                    const totalPareto = counts.A + counts.B + counts.C || 1;
+                    
+                    doc.autoTable({
+                        startY: currentY,
+                        head: [['Tipo', 'Ítems', 'Part. %']],
+                        body: [
+                            ['A (Vitales)', counts.A, ((counts.A/totalPareto)*100).toFixed(1)+'%'],
+                            ['B (Esenciales)', counts.B, ((counts.B/totalPareto)*100).toFixed(1)+'%'],
+                            ['C (No Esenciales)', counts.C, ((counts.C/totalPareto)*100).toFixed(1)+'%']
+                        ],
+                        theme: 'grid',
+                        margin: { left: margins.left + 130 },
+                        tableWidth: 50,
+                        headStyles: { fillColor: [100, 100, 100], fontSize: 8 },
+                        bodyStyles: { fontSize: 8 }
+                    });
+                    
+                    currentY += 70; // Espacio de la gráfica
+                }
+            } catch(e) { console.error("Error Pareto img", e); }
+
+            // --- SECCIÓN III: DETALLE DE ÍTEMS ---
+            // Verificar espacio en página
+            if (currentY > pageHeight - 50) { doc.addPage(); drawHeader(doc); currentY = margins.top; }
+
+            doc.setFillColor(240, 240, 245);
+            doc.rect(margins.left, currentY - 5, pageWidth - 30, 8, 'F');
+            doc.setTextColor(49, 39, 130);
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(11);
+            doc.text("III. DETALLE DE ÍTEMS FARMACÉUTICOS (Muestra)", margins.left + 2, currentY);
+            currentY += 5;
+
+            // Obtener datos del libro seleccionado o el primero
+            let selectedSheet = document.getElementById('inventory-book-select').value;
+            if(!selectedSheet && window.productGroups.length > 0) selectedSheet = window.productGroups[0].name;
+            
+            let itemsData = [];
+            if(selectedSheet && window.sheetsData[selectedSheet]) {
                 doc.setFontSize(8);
                 doc.setTextColor(100);
+                doc.text(`Fuente: ${selectedSheet} | Mostrando primeros 200 registros por optimización.`, margins.left, currentY + 4);
+                currentY += 6;
                 
-                // Izquierda: Fecha
-                doc.text(`Generado: ${currentDate}`, 15, pageHeight - 10);
-                
-                // Centro: Paginación
-                doc.text(`Página ${i} de ${pageCount}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
-                
-                // Derecha: Consecutivo
-                doc.text(`Consecutivo: ${consecutive}`, pageWidth - 15, pageHeight - 10, { align: 'right' });
-            }
-
-            doc.save(`Costeo_Unitario_${consecutive}.pdf`);
-        }
-
-        // --- LÓGICA DE DESCARGA PDF DE CARACTERIZACIÓN (SECCIÓN V) ---
-        async function downloadCharacterizationPDF() {
-            if (!window.jspdf) { alert("No se pudo cargar la librería jsPDF."); return; }
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF("p", "mm", "letter");
-            let y = 12;
-
-            try {
-                const img = new Image();
-                img.src = Logo_HUHMP_Blanco || "Logo_HUHMP_Blanco.png"; 
-                if(Logo_HUHMP_Blanco) doc.addImage(img, "PNG", 10, 8, 35, 14);
-            } catch (e) { console.warn("No logo loaded", e); }
-
-            doc.setFontSize(9);
-            doc.setFont("helvetica", "bold");
-            doc.text("FORMULARIO DE TARIFAS FARMACÉUTICAS", 55, y);
-            doc.setFont("helvetica", "normal");
-            doc.text("ESE Hospital Universitario Hernando Moncaleano Perdomo", 55, y + 5);
-            doc.text("Neiva - Huila", 55, y + 10);
-            const fechaStr = new Date().toLocaleString("es-CO");
-            doc.text("Fecha de generación: " + fechaStr, 55, y + 15);
-
-            y = 35;
-
-            if (!window.currentExportData || window.currentExportData.length === 0) {
-                doc.setFontSize(10);
-                doc.text("No hay datos disponibles para exportar. Primero genere la caracterización.", 10, y);
-                doc.save("Tarifas_Farmaceuticas.pdf");
-                return;
-            }
-
-            // Filtrar columnas para el PDF (para que quepan)
-            const keysToPrint = ['código', 'descripción', 'precio 2025', '_costoTotal', '_tarifaVenta2026', '_category'];
-            
-            // Cabeceras
-            const headers = ["Cód", "Descripción", "Precio 25", "Costo Tot", "Tarifa 26", "Categoría"];
-            const colWidths = [20, 60, 25, 25, 25, 35]; // Ajuste manual de anchos
-            
-            doc.setFontSize(7);
-            doc.setFont("helvetica", "bold");
-            
-            let x = 10;
-            headers.forEach((h, i) => {
-                doc.text(h, x, y);
-                x += colWidths[i];
-            });
-            
-            y += 5;
-            doc.setFont("helvetica", "normal");
-
-            window.currentExportData.forEach(row => {
-                if (y > 260) { doc.addPage(); y = 20; }
-                
-                x = 10;
-                // Mapear datos
-                const vals = [
+                // Mapear datos para tabla
+                itemsData = window.sheetsData[selectedSheet].slice(0, 200).map(row => [
                     getColumnVal(row, ['código', 'codigo']),
-                    getColumnVal(row, ['descripción', 'descripcion']).substring(0, 35),
+                    String(getColumnVal(row, ['descripción', 'descripcion'])).substring(0, 40),
                     formatMoney(cleanCurrency(getColumnVal(row, ['precio 2025']))),
+                    getColumnVal(row, ['unidades', 'n° unidades']),
+                    formatMoney(cleanCurrency(getColumnVal(row, ['valor máximo', 'valor maximo']))),
+                    getColumnVal(row, ['pareto', 'páreto'])
+                ]);
+            } else {
+                itemsData = [['-', 'No hay datos seleccionados o cargados', '-', '-', '-', '-']];
+            }
+
+            doc.autoTable({
+                startY: currentY,
+                head: [['Código', 'Descripción', 'Precio 2025', 'Unds', 'Valor Compra', 'Clas.']],
+                body: itemsData,
+                theme: 'plain',
+                styles: { fontSize: 7, cellPadding: 1 },
+                headStyles: { fillColor: [220, 220, 220], textColor: 50, fontStyle: 'bold' },
+                columnStyles: { 
+                    1: { cellWidth: 70 },
+                    2: { halign: 'right' },
+                    3: { halign: 'right' },
+                    4: { halign: 'right' },
+                    5: { halign: 'center' }
+                },
+                margin: { left: margins.left, right: margins.right }
+            });
+            currentY = doc.lastAutoTable.finalY + 15;
+
+            // --- SECCIÓN IV: COSTOS INDIRECTOS ---
+            if (currentY > pageHeight - 60) { doc.addPage(); drawHeader(doc); currentY = margins.top; }
+
+            doc.setFillColor(240, 240, 245);
+            doc.rect(margins.left, currentY - 5, pageWidth - 30, 8, 'F');
+            doc.setTextColor(49, 39, 130);
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(11);
+            doc.text("IV. ESTRUCTURA DE COSTOS INDIRECTOS", margins.left + 2, currentY);
+            currentY += 5;
+
+            const costBody = window.costStructure.map(c => [c.name, c.percent + " %"]);
+            const totalInd = window.costStructure.reduce((a,b) => a + b.percent, 0).toFixed(2);
+            costBody.push(['TOTAL RECUPERACIÓN INDIRECTA', totalInd + " %"]);
+
+            doc.autoTable({
+                startY: currentY,
+                head: [['Rubro de Costo', 'Porcentaje Asignado']],
+                body: costBody,
+                theme: 'grid',
+                tableWidth: 100,
+                headStyles: { fillColor: [49, 39, 130], textColor: 255 },
+                didParseCell: function(data) {
+                    if (data.row.index === costBody.length - 1) data.cell.styles.fontStyle = 'bold';
+                },
+                margin: { left: margins.left }
+            });
+            currentY = doc.lastAutoTable.finalY + 15;
+
+            // --- SECCIÓN V: CARACTERIZACIÓN (RESULTADOS) ---
+            doc.addPage(); drawHeader(doc); currentY = margins.top;
+            
+            doc.setFillColor(240, 240, 245);
+            doc.rect(margins.left, currentY - 5, pageWidth - 30, 8, 'F');
+            doc.setTextColor(49, 39, 130);
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(11);
+            doc.text("V. CARACTERIZACIÓN Y PROYECCIÓN 2026", margins.left + 2, currentY);
+            currentY += 5;
+
+            // Usar window.currentExportData si existe (datos calculados de la tabla V)
+            let charData = [];
+            if (window.currentExportData && window.currentExportData.length > 0) {
+                 doc.setFontSize(8);
+                doc.setTextColor(100);
+                doc.text(`Base de cálculo: ${selectedSheet} | Incremento aplicado: ${document.getElementById('increment-percent').value}% | Muestra parcial.`, margins.left, currentY + 4);
+                currentY += 6;
+
+                charData = window.currentExportData.slice(0, 150).map(row => [
+                    getColumnVal(row, ['código', 'codigo']),
+                    String(getColumnVal(row, ['descripción', 'descripcion'])).substring(0, 30),
                     formatMoney(row._costoTotal),
                     formatMoney(row._tarifaVenta2026),
-                    row._category.substring(0, 20)
-                ];
+                    row._variacionRelativa.toFixed(1) + '%',
+                    row._category
+                ]);
+            } else {
+                charData = [['-', 'Debe visualizar la sección V en la app primero', '-', '-', '-', '-']];
+            }
 
-                vals.forEach((v, i) => {
-                    doc.text(String(v), x, y);
-                    x += colWidths[i];
-                });
-                y += 4;
+            doc.autoTable({
+                startY: currentY,
+                head: [['Cód', 'Descripción', 'Costo Tot', 'Tarifa 2026', 'Var %', 'Categoría']],
+                body: charData,
+                theme: 'striped',
+                styles: { fontSize: 7 },
+                headStyles: { fillColor: [0, 128, 65] }, // Verde secundario
+                columnStyles: { 
+                    2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } 
+                },
+                margin: { left: margins.left, right: margins.right }
+            });
+            currentY = doc.lastAutoTable.finalY + 15;
+
+            // --- SECCIÓN CONCLUSIONES (AUTOMÁTICAS) ---
+            if (currentY > pageHeight - 80) { doc.addPage(); drawHeader(doc); currentY = margins.top; }
+
+            doc.setFillColor(240, 240, 245);
+            doc.rect(margins.left, currentY - 5, pageWidth - 30, 8, 'F');
+            doc.setTextColor(49, 39, 130);
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(11);
+            doc.text("CONCLUSIONES DEL MODELO", margins.left + 2, currentY);
+            currentY += 10;
+
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(10);
+            doc.setTextColor(20);
+
+            const conclusions = [
+                `1. SOSTENIBILIDAD FINANCIERA: La estructura de costos definida incorpora un margen de recuperación indirecta del ${totalInd}%, distribuido en mano de obra, logística y administración. Este margen permite mitigar la carga operativa sobre el costo directo del medicamento, asegurando que la tarifa 2026 cubra no solo la adquisición sino la gestión del servicio farmacéutico.`,
+                "",
+                `2. EFICIENCIA PARETO Y FLUJO DE CAJA: El análisis evidencia que la gestión de inventarios debe focalizarse estrictamente en los productos Tipo A (Vitales/Elite). Al aplicar políticas de "Justo a Tiempo" en este segmento, la institución optimizará su capital de trabajo, reduciendo costos de almacenamiento en referencias de alto valor unitario.`,
+                "",
+                `3. IMPACTO TARIFARIO Y REGULACIÓN: La caracterización de bienes permite discriminar entre productos regulados y de mercado libre. La proyección tarifaria respeta los techos de precios para medicamentos regulados (CNPMDM), mientras que en los productos de libre competencia (Clásicos/Plata) se aplica un incremento indexado para proteger la rentabilidad ante la inflación del sector salud.`
+            ];
+
+            doc.text(conclusions, margins.left, currentY, { maxWidth: pageWidth - 30, align: "justify" });
+            currentY += 50;
+
+            // --- SECCIÓN VI: FIRMAS ---
+            if (currentY > pageHeight - 40) { doc.addPage(); drawHeader(doc); currentY = margins.top; }
+            
+            doc.setFillColor(240, 240, 245);
+            doc.rect(margins.left, currentY - 5, pageWidth - 30, 8, 'F');
+            doc.setTextColor(49, 39, 130);
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(11);
+            doc.text("VI. VALIDACIÓN Y FIRMAS", margins.left + 2, currentY);
+            currentY += 15;
+
+            const sigBody = window.signatures.map(s => [
+                s.role + ":\n\n_______________________\n" + s.name + "\n" + s.cargo
+            ]);
+            
+            // Disposición horizontal de firmas (hasta 3 por fila)
+            let sigRow = [];
+            window.signatures.forEach((s) => {
+                sigRow.push(s.role + "\n\n\n__________________________\n" + s.name + "\n" + s.cargo);
+            });
+            
+            doc.autoTable({
+                startY: currentY,
+                head: [],
+                body: [sigRow],
+                theme: 'plain',
+                styles: { halign: 'center', valign: 'bottom', fontSize: 9, cellPadding: 2 },
+                margin: { left: margins.left }
             });
 
-            doc.save("Resumen_Tarifas_2026.pdf");
-        }
-    </script>
-</body>
-</html>
+            // --- NUMERACIÓN FINAL ---
+            const totalPages = doc.internal.getNumberOfPages();
+            for (let i = 1; i <= totalPages; i++) {
+                doc.setPage(i);
+                drawHeader(doc); // Redibujar header en todas por si acaso (capas)
+                drawFooter(doc, i, totalPages);
+            }
+
+            doc.save(`Informe_Tarifas_Completo_${consecutive}.pdf`);
+        };
+        
+        // --- FIN LOGICA PDF ---
