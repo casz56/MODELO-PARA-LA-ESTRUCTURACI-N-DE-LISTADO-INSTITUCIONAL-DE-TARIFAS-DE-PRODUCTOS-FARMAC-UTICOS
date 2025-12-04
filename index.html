@@ -255,8 +255,8 @@
                             <p id="detail-revenue" class="text-xl font-bold text-secundario">$ 0</p>
                         </div>
                         <div class="bg-white p-4 rounded border border-slate-100 shadow-sm">
-                            <p class="text-xs text-slate-500 uppercase font-bold mb-1">Top Clasificación</p>
-                            <p id="detail-top-pareto" class="text-xl font-bold text-terciario">-</p>
+                            <p class="text-xs text-slate-500 uppercase font-bold mb-1">Variación $ (Venta - Costo)</p>
+                            <p id="detail-variation" class="text-xl font-bold text-terciario">$ 0</p>
                         </div>
                     </div>
                 </div>
@@ -820,6 +820,7 @@
             }
 
             const incrementPercent = parseFloat(document.getElementById('increment-percent').value) || 0;
+            // Aseguramos que se tome la estructura de costos actualizada
             const totalIndirectPercent = window.costStructure.reduce((sum, item) => sum + item.percent, 0);
 
             // 1. GENERAR CABECERAS DINÁMICAS (Usamos la fila 0, asumiendo consistencia)
@@ -835,6 +836,8 @@
             headerHTML += '<th class="px-4 py-3 text-right bg-blue-50">Costo Total</th>';
             headerHTML += '<th class="px-4 py-3 text-right bg-blue-50">Costo 2026 (Proy)</th>';
             headerHTML += '<th class="px-4 py-3 text-right bg-blue-900 text-white font-bold border-l border-blue-700">Tarifa Venta 2026</th>';
+            headerHTML += '<th class="px-4 py-3 text-right bg-green-50 border-l border-green-200 font-bold text-green-800">Var. Absoluta ($)</th>';
+            headerHTML += '<th class="px-4 py-3 text-right bg-green-50 font-bold text-green-800">Var. Relativa (%)</th>';
             headerHTML += '<th class="px-4 py-3 text-center font-bold bg-blue-900 text-white">CATEGORIZACIÓN</th>';
             headerHTML += '</tr>';
             thead.innerHTML = headerHTML;
@@ -853,7 +856,7 @@
                 const pareto = (getColumnVal(row, ['pareto', 'páreto']) || 'N/A').toUpperCase().trim();
                 const identA = (getColumnVal(row, ['identificación', 'identificacion', 'a+']) || '').toUpperCase();
 
-                // 1. COSTOS INDIRECTOS = VALOR MÁXIMO DE COMPRA * % INDIRECTOS
+                // 1. COSTOS INDIRECTOS = VALOR MÁXIMO DE COMPRA * % INDIRECTOS (Sujeto a Sección IV)
                 const costosIndirectos = valCompra * (totalIndirectPercent / 100);
 
                 // 2. COSTO TOTAL = VALOR MÁXIMO DE COMPRA + COSTOS INDIRECTOS
@@ -876,18 +879,16 @@
                 
                 if (desc && desc.toLowerCase().includes('regulado')) { category = "REGULADOS"; badgeClass = "bg-cat-regulados"; }
                 
-                // 4. TARIFA DE VENTA 2026 - LÓGICA SOLICITADA
-                // REGULADOS: Mantienen Precio 2025 (No hay incremento).
-                // NO REGULADOS: Precio 2025 + Incremento % (Esto es lo que llamamos Precio 2026)
-                // El usuario pidió: "Tarifa Venta 2026 ... será la misma información de la columna de precio 2026".
-                // Asumimos Precio 2026 = Precio 2025 * (1 + Incremento)
-                const precio2026Calculado = precio2025 * (1 + (incrementPercent / 100));
-
+                // 4. TARIFA DE VENTA 2026
                 if (category === "REGULADOS") {
                     tarifaVenta2026 = precio2025; // Regulado no sube
                 } else {
-                    tarifaVenta2026 = precio2026Calculado; // No regulado sube
+                    tarifaVenta2026 = precio2025 * (1 + (incrementPercent / 100)); // Precio 2026 calculado
                 }
+
+                // 5. NUEVOS CÁLCULOS SOLICITADOS (Variaciones)
+                const variacionAbsoluta = tarifaVenta2026 - precio2025;
+                const variacionRelativa = precio2025 !== 0 ? (variacionAbsoluta / precio2025) * 100 : 0;
 
                 if (categoryCounts.hasOwnProperty(category)) {
                     categoryCounts[category]++;
@@ -900,7 +901,9 @@
                     _costosIndirectos: costosIndirectos,
                     _costoTotal: costoTotal,
                     _costo2026: costo2026,
-                    _tarifaVenta2026: tarifaVenta2026, 
+                    _tarifaVenta2026: tarifaVenta2026,
+                    _variacionAbsoluta: variacionAbsoluta,
+                    _variacionRelativa: variacionRelativa, 
                     _category: category, 
                     _badgeClass: badgeClass 
                 };
@@ -938,6 +941,10 @@
                 rowHTML += `<td class="px-4 py-2 text-right text-xs bg-blue-50 text-slate-700 font-semibold">${formatMoney(d._costoTotal)}</td>`;
                 rowHTML += `<td class="px-4 py-2 text-right text-xs bg-blue-50 text-slate-800 font-bold">${formatMoney(d._costo2026)}</td>`;
                 rowHTML += `<td class="px-4 py-2 text-right font-extrabold text-white bg-blue-800 text-xs shadow-inner border-l-2 border-white">${formatMoney(d._tarifaVenta2026)}</td>`;
+                // Nuevas celdas de variación
+                rowHTML += `<td class="px-4 py-2 text-right text-xs bg-green-50 text-green-700 font-bold border-l border-green-100">${formatMoney(d._variacionAbsoluta)}</td>`;
+                rowHTML += `<td class="px-4 py-2 text-right text-xs bg-green-50 text-green-700 font-bold">${d._variacionRelativa.toFixed(2)}%</td>`;
+                
                 rowHTML += `<td class="px-4 py-2 text-center"><span class="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${d._badgeClass}">${d._category}</span></td>`;
                 
                 rowHTML += '</tr>';
@@ -968,6 +975,8 @@
                 newRow['Costo Total'] = d._costoTotal;
                 newRow['Costo Proyectado 2026'] = d._costo2026;
                 newRow['Tarifa Venta 2026'] = d._tarifaVenta2026;
+                newRow['Variación Absoluta 25-26 ($)'] = d._variacionAbsoluta;
+                newRow['Variación Relativa 25-26 (%)'] = d._variacionRelativa / 100; // Para formato % en Excel si se desea
                 newRow['Categoría Final'] = d._category;
 
                 return newRow;
@@ -1151,12 +1160,24 @@
             const group = window.productGroups[index];
             const panel = document.getElementById('book-detail-panel');
             panel.classList.remove('hidden');
+            
+            // CÁLCULO DE VARIACIÓN (NUEVO)
+            // Variación $ = Venta Proyectada - Costo Total Inventario
+            // Nota: group.revenue es el valor de venta estimado (costo * 1.3 en el ejemplo actual, pero viene de data real si existiera)
+            const variation = group.revenue - group.cost;
+
             document.getElementById('detail-title').innerText = group.name;
             document.getElementById('detail-items-badge').innerText = `${group.count} Ítems`;
             document.getElementById('detail-cost').innerText = formatMoney(group.cost);
             document.getElementById('detail-revenue').innerText = formatMoney(group.revenue);
-            document.getElementById('detail-top-pareto').innerText = `Mayoría ${group.topPareto}`;
             
+            // Actualización de la tarjeta de Variación
+            const varElement = document.getElementById('detail-variation');
+            varElement.innerText = formatMoney(variation);
+            // Color condicional simple
+            if(variation >= 0) varElement.className = "text-xl font-bold text-green-600";
+            else varElement.className = "text-xl font-bold text-red-600";
+
             document.getElementById('inventory-book-select').value = group.name;
             renderInventoryTable(group.name);
             document.getElementById('char-book-select').value = group.name;
@@ -1246,7 +1267,15 @@
             document.getElementById('total-indirect-percent').innerText = totalPercent.toFixed(2) + "%";
         }
 
-        window.updateCost = (i,v) => { window.costStructure[i].percent = parseFloat(v)||0; renderCostStructure(); if(window.saveDataToFirebase) window.saveDataToFirebase(); };
+        window.updateCost = (i,v) => { 
+            window.costStructure[i].percent = parseFloat(v)||0; 
+            renderCostStructure(); 
+            // IMPORTANTE: Al cambiar costos, debemos actualizar la tabla de caracterización si está visible
+            const currentBook = document.getElementById('char-book-select').value;
+            if(currentBook) renderCharacterizationTable(currentBook);
+
+            if(window.saveDataToFirebase) window.saveDataToFirebase(); 
+        };
 
         function renderSignatures() {
             document.getElementById('signatures-body').innerHTML = window.signatures.map((s, idx) => `
@@ -1395,7 +1424,6 @@
         }
 
         // --- LÓGICA DE DESCARGA PDF DE CARACTERIZACIÓN (SECCIÓN V) ---
-        // Se mantiene la función en caso de requerirse en el futuro, aunque no haya botón visible.
         async function downloadCharacterizationPDF() {
             if (!window.jspdf) { alert("No se pudo cargar la librería jsPDF."); return; }
             const { jsPDF } = window.jspdf;
@@ -1426,9 +1454,12 @@
                 return;
             }
 
+            // Filtrar columnas para el PDF (para que quepan)
             const keysToPrint = ['código', 'descripción', 'precio 2025', '_costoTotal', '_tarifaVenta2026', '_category'];
+            
+            // Cabeceras
             const headers = ["Cód", "Descripción", "Precio 25", "Costo Tot", "Tarifa 26", "Categoría"];
-            const colWidths = [20, 60, 25, 25, 25, 35];
+            const colWidths = [20, 60, 25, 25, 25, 35]; // Ajuste manual de anchos
             
             doc.setFontSize(7);
             doc.setFont("helvetica", "bold");
@@ -1446,6 +1477,7 @@
                 if (y > 260) { doc.addPage(); y = 20; }
                 
                 x = 10;
+                // Mapear datos
                 const vals = [
                     getColumnVal(row, ['código', 'codigo']),
                     getColumnVal(row, ['descripción', 'descripcion']).substring(0, 35),
