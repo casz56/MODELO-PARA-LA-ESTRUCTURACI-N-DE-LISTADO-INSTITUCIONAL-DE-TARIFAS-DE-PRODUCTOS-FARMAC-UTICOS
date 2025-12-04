@@ -14,10 +14,6 @@
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
-    <!-- jsPDF & AutoTable -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
-    
     <!-- PapaParse (CSV) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 
@@ -122,9 +118,6 @@
         .table-input { width: 100%; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.25rem 0.5rem; font-size: 0.875rem; }
         .table-input:focus { outline: none; border-color: #312782; box-shadow: 0 0 0 2px rgba(49, 39, 130, 0.1); }
         
-        .logo-upload-area { cursor: pointer; border: 2px dashed rgba(255, 255, 255, 0.5); border-radius: 0.5rem; padding: 0.5rem; background-color: rgba(255, 255, 255, 0.1); }
-        .logo-upload-area:hover { background-color: rgba(255, 255, 255, 0.2); }
-        
         .data-upload-zone { border: 2px dashed #cbd5e1; border-radius: 0.5rem; background-color: #f8fafc; transition: all 0.3s; }
         .data-upload-zone:hover { border-color: #312782; background-color: #eef2ff; }
         
@@ -161,24 +154,32 @@
             z-index: 10;
             white-space: nowrap;
         }
+        
+        .info-card {
+            border-left: 4px solid;
+            background-color: #fff;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            height: 100%;
+        }
+        
+        /* Cursor pointer for charts to indicate interactivity */
+        canvas {
+            cursor: pointer;
+        }
     </style>
 </head>
-<body class="p-4 md:p-8 text-slate-800">
+<body class="p-4 md:p-8 text-slate-800 flex flex-col min-h-screen">
 
-    <div class="max-w-7xl mx-auto space-y-6">
+    <div class="max-w-7xl mx-auto space-y-6 flex-grow">
         
         <!-- ENCABEZADO -->
         <header class="bg-principal text-white p-6 rounded-xl shadow-lg flex flex-col md:flex-row justify-between items-center gap-4 relative overflow-hidden">
             <div class="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-16 -mt-16 pointer-events-none"></div>
             
             <div class="flex items-center gap-4 z-10 w-full md:w-auto">
-                <div class="logo-upload-area group" onclick="document.getElementById('Logo_HUHMP_Blanco_Input').click()" title="Clic para cargar el archivo local">
-                    <img id="Logo_HUHMP_Blanco_Preview" src="" alt="Logo Blanco" class="h-12 w-auto object-contain drop-shadow-md mb-1">
-                    <span class="text-[0.65rem] text-yellow-400 font-bold text-center block leading-tight mt-1"><i class="fas fa-upload mr-1"></i>Cargar archivo:<br>Logo_HUHMP_Blanco</span>
-                    <input type="file" id="Logo_HUHMP_Blanco_Input" accept="image/png, image/jpeg, image/svg+xml" class="hidden" onchange="updateSpecificLogo(this)">
-                </div>
-                
-                <div class="flex-grow border-l border-blue-800 pl-4 ml-2">
+                <div class="flex-grow pl-2">
                     <h1 class="text-2xl md:text-3xl font-bold leading-tight">Modelo de Tarifas Farmacéuticas</h1>
                     <p class="text-blue-200 text-sm md:text-base">ESE Hospital Universitario Hernando Moncaleano Perdomo</p>
                     <div class="flex items-center justify-between mt-1">
@@ -191,9 +192,6 @@
             <div class="flex gap-3 z-10 flex-shrink-0">
                 <button onclick="resetApp()" class="bg-red-500 hover:bg-red-700 text-white px-5 py-2.5 rounded-lg shadow-md transition-colors flex items-center font-semibold text-sm ring-2 ring-red-500 ring-offset-2 ring-offset-blue-900" title="Borrar datos y reiniciar">
                     <i class="fas fa-undo mr-2"></i> Restablecer
-                </button>
-                <button onclick="generatePDF()" class="bg-secundario hover:bg-green-700 text-white px-5 py-2.5 rounded-lg shadow-md transition-colors flex items-center font-semibold text-sm ring-2 ring-green-600 ring-offset-2 ring-offset-blue-900">
-                    <i class="fas fa-file-pdf mr-2"></i> Generar PDF
                 </button>
             </div>
         </header>
@@ -253,7 +251,7 @@
                 <div class="flex flex-col sm:flex-row justify-between items-center mb-6 border-b pb-4 gap-4">
                     <div>
                         <h2 class="text-xl font-bold text-slate-700">II. Análisis de Pareto</h2>
-                        <span class="text-xs text-slate-500">Clasificación basada en conteo de filas por categoría</span>
+                        <span class="text-xs text-slate-500">Haga clic en los gráficos para filtrar la tabla de detalle (Sección III)</span>
                     </div>
                     <div class="flex items-center gap-2 bg-slate-100 p-2 rounded-lg">
                         <label for="pareto-book-select" class="text-xs font-bold text-slate-600 uppercase"><i class="fas fa-filter mr-1"></i>Fuente:</label>
@@ -262,21 +260,38 @@
                         </select>
                     </div>
                 </div>
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <div class="bg-slate-50 p-4 rounded-lg border border-slate-100 shadow-sm">
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-6">
+                    <div class="bg-slate-50 p-4 rounded-lg border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
                         <h3 class="text-sm font-semibold text-center mb-2 text-slate-600">Conteo por Clasificación (Filas)</h3>
                         <div class="relative h-64"><canvas id="paretoChart"></canvas></div>
                     </div>
-                    <div class="bg-slate-50 p-4 rounded-lg border border-slate-100 shadow-sm">
+                    <div class="bg-slate-50 p-4 rounded-lg border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
                         <div class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-2">
                             <h3 class="text-sm font-semibold text-slate-600">Distribución %</h3>
                         </div>
                         <div class="relative h-64 flex justify-center"><canvas id="paretoPieChart"></canvas></div>
                     </div>
                 </div>
+
+                <!-- Explicación de Pareto (Texto Actualizado) -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <div class="info-card border-l-red-500">
+                        <h4 class="font-bold text-slate-800 mb-1">Tipo A (Vitales)</h4>
+                        <p class="text-slate-600 text-xs text-justify">Representan aproximadamente el <strong>80% del valor total</strong> del inventario pero solo el 20% de los ítems. Son productos de alto costo o alta rotación que requieren control estricto.</p>
+                    </div>
+                    <div class="info-card border-l-yellow-400">
+                        <h4 class="font-bold text-slate-800 mb-1">Tipo B (Esenciales)</h4>
+                        <p class="text-slate-600 text-xs text-justify">Representan cerca del <strong>15% del valor</strong> y el 30% de los ítems. Tienen una importancia media y requieren controles moderados.</p>
+                    </div>
+                    <div class="info-card border-l-blue-400">
+                        <h4 class="font-bold text-slate-800 mb-1">Tipo C (No Esenciales)</h4>
+                        <p class="text-slate-600 text-xs text-justify">Representan solo el <strong>5% del valor</strong> pero constituyen el 50% de los ítems. Son productos de bajo costo con controles más flexibles.</p>
+                    </div>
+                </div>
             </section>
 
-            <!-- SECCIÓN III: Detalle de Ítems (CON BÚSQUEDA) -->
+            <!-- SECCIÓN III: Detalle de Ítems -->
             <section id="section-detalle-items" class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                 <div class="flex flex-col lg:flex-row justify-between items-center mb-4 border-b pb-4 gap-4">
                     <div>
@@ -284,7 +299,6 @@
                         <p class="text-sm text-slate-500">Visualización detallada por libro cargado</p>
                     </div>
                     
-                    <!-- CONTROLES: LIBRO Y BÚSQUEDA -->
                     <div class="flex flex-col sm:flex-row gap-3 items-center">
                         <div class="flex items-center gap-2 bg-white border border-slate-300 p-1.5 rounded-lg shadow-sm focus-within:ring-2 focus-within:ring-blue-500 transition-all">
                              <i class="fas fa-search text-slate-400 pl-2"></i>
@@ -422,27 +436,49 @@
                 <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 border-b pb-4 gap-4">
                     <div>
                         <h2 class="text-xl font-bold text-slate-700">V. Caracterización de Bienes</h2>
-                        <p class="text-sm text-slate-500">Clasificación dinámica de todo el inventario cargado</p>
+                        <p class="text-sm text-slate-500">Clasificación dinámica. Haga clic en las gráficas para filtrar.</p>
                     </div>
                     
                     <div class="flex flex-col gap-3 items-end">
-                        <div class="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200 w-full sm:w-auto">
-                            <label for="increment-percent" class="text-xs font-bold text-slate-600 uppercase">Incremento 2026 (%):</label>
-                            <input type="number" id="increment-percent" value="10" class="table-input w-16 text-right font-bold text-principal" onchange="renderCharacterizationTable(document.getElementById('char-book-select').value)">
+                        <div class="flex gap-2">
+                             <div class="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200 w-full sm:w-auto">
+                                <label for="increment-percent" class="text-xs font-bold text-slate-600 uppercase">Incremento 2026 (%):</label>
+                                <input type="number" id="increment-percent" value="10" class="table-input w-16 text-right font-bold text-principal" onchange="renderCharacterizationTable(document.getElementById('char-book-select').value)">
+                            </div>
+    
+                            <div class="flex items-center gap-2 bg-slate-100 p-2 rounded-lg border border-slate-200 w-full sm:w-auto">
+                                <label for="char-book-select" class="text-xs font-bold text-slate-600 uppercase"><i class="fas fa-book mr-1"></i>Libro:</label>
+                                <select id="char-book-select" onchange="renderCharacterizationTable(this.value)" class="text-sm border-none bg-transparent focus:ring-0 text-principal font-bold cursor-pointer outline-none">
+                                    <option value="">Seleccione...</option>
+                                </select>
+                            </div>
                         </div>
-
-                        <div class="flex items-center gap-2 bg-slate-100 p-2 rounded-lg border border-slate-200 w-full sm:w-auto">
-                            <label for="char-book-select" class="text-xs font-bold text-slate-600 uppercase"><i class="fas fa-book mr-1"></i>Libro:</label>
-                            <select id="char-book-select" onchange="renderCharacterizationTable(this.value)" class="text-sm border-none bg-transparent focus:ring-0 text-principal font-bold cursor-pointer outline-none">
-                                <option value="">Seleccione...</option>
-                            </select>
-                        </div>
+                        
+                        <!-- BOTÓN DESCARGA EXCEL -->
+                        <button onclick="downloadCharacterizationExcel()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow-sm text-xs font-bold flex items-center gap-2 transition-colors">
+                            <i class="fas fa-file-excel"></i> Descargar Excel Completo (Con Cálculos)
+                        </button>
                     </div>
                 </div>
 
                 <!-- FILTROS DE CATEGORÍA (Botones informativos) -->
                 <div class="flex flex-wrap gap-2 mb-4 justify-center" id="category-filters">
                     <!-- El contenido de este div se generará dinámicamente en JS -->
+                </div>
+
+                <!-- GRÁFICAS DE CARACTERIZACIÓN (DOS COLUMNAS) -->
+                <div class="border-b pb-6 mb-6">
+                    <h3 class="text-sm font-bold text-slate-700 mb-4 text-center">Distribución Estratégica del Portafolio (Interactiva)</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div class="relative h-64 w-full">
+                            <h4 class="text-center text-xs font-bold mb-2 text-slate-500">Distribución % (Clic para filtrar)</h4>
+                            <canvas id="characterizationChart"></canvas> <!-- Gráfica de Dona -->
+                        </div>
+                        <div class="relative h-64 w-full">
+                             <h4 class="text-center text-xs font-bold mb-2 text-slate-500">Cantidad por Categoría (Clic para filtrar)</h4>
+                            <canvas id="characterizationBarChart"></canvas> <!-- Nueva Gráfica de Barras -->
+                        </div>
+                    </div>
                 </div>
 
                 <div class="inventory-table-container mb-8">
@@ -459,19 +495,32 @@
                         </tbody>
                     </table>
                 </div>
-
-                <!-- GRÁFICAS DE CARACTERIZACIÓN (DOS COLUMNAS) -->
-                <div class="border-t pt-6">
-                    <h3 class="text-sm font-bold text-slate-700 mb-4 text-center">Distribución Estratégica del Portafolio (Categorización)</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div class="relative h-64 w-full">
-                            <h4 class="text-center text-xs font-bold mb-2 text-slate-500">Distribución %</h4>
-                            <canvas id="characterizationChart"></canvas> <!-- Gráfica de Dona -->
-                        </div>
-                        <div class="relative h-64 w-full">
-                             <h4 class="text-center text-xs font-bold mb-2 text-slate-500">Cantidad por Categoría</h4>
-                            <canvas id="characterizationBarChart"></canvas> <!-- Nueva Gráfica de Barras -->
-                        </div>
+                
+                <!-- Explicación de Categorías (Texto Actualizado) -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs mt-4">
+                     <div class="info-card border-l-black">
+                        <h4 class="font-bold text-black mb-1">BLACK (A + Estratégico)</h4>
+                        <p class="text-slate-600">Máxima prioridad. Productos Pareto A con Identificación estratégica (A+). Requieren gestión intensiva.</p>
+                    </div>
+                    <div class="info-card border-l-indigo-800">
+                        <h4 class="font-bold text-indigo-900 mb-1">ELITE (A)</h4>
+                        <p class="text-slate-600">Productos Pareto A estándar. Alto impacto en costo y rotación.</p>
+                    </div>
+                    <div class="info-card border-l-yellow-400">
+                        <h4 class="font-bold text-yellow-700 mb-1">ORO (B)</h4>
+                        <p class="text-slate-600">Productos Pareto B. Impacto medio en el presupuesto.</p>
+                    </div>
+                    <div class="info-card border-l-gray-400">
+                        <h4 class="font-bold text-gray-700 mb-1">PLATA (C)</h4>
+                        <p class="text-slate-600">Productos Pareto C. Bajo impacto financiero pero alto volumen de referencias.</p>
+                    </div>
+                    <div class="info-card border-l-blue-500">
+                        <h4 class="font-bold text-blue-700 mb-1">CLÁSICOS</h4>
+                        <p class="text-slate-600">Ítems estándar que no clasifican en la matriz principal de Pareto.</p>
+                    </div>
+                    <div class="info-card border-l-green-500">
+                        <h4 class="font-bold text-green-700 mb-1">REGULADOS</h4>
+                        <p class="text-slate-600">Productos con precios controlados por la CNPMDM. Su tarifa de venta 2026 no tiene incremento.</p>
                     </div>
                 </div>
             </section>
@@ -489,6 +538,12 @@
                 </div>
             </section>
         </main>
+        
+        <!-- FOOTER -->
+        <footer class="text-center py-6 text-xs text-slate-500 mt-8 border-t border-slate-200">
+            <p class="font-bold text-slate-600">© 2025 ESE HUHMP - Hospital Universitario Hernando Moncaleano Perdomo</p>
+            <p>Documento controlado. Cualquier impresión es copia no controlada.</p>
+        </footer>
     </div>
 
     <script>
@@ -503,6 +558,9 @@
         let characterizationChart = null; // Chart Dona
         let characterizationBarChart = null; // Chart Barras
         let currentCategoryFilter = 'ALL';
+        let currentParetoFilter = 'ALL';
+        // Variable global para almacenar datos procesados para exportación
+        let currentExportData = []; 
 
         // Configuraciones Iniciales
         window.costStructure = [
@@ -519,7 +577,6 @@
         ];
 
         window.onload = () => {
-            initLogo();
             renderCostStructure();
             renderSignatures();
             initCharts();
@@ -543,10 +600,9 @@
             window.productGroups = [];
             window.currentBaseCost = 1000000000;
             currentCategoryFilter = 'ALL';
+            currentParetoFilter = 'ALL';
             
             document.getElementById('pharmacy-file-upload').value = "";
-            document.getElementById('Logo_HUHMP_Blanco_Input').value = "";
-            initLogo();
             
             if(paretoChart) { paretoChart.data.labels = []; paretoChart.data.datasets[0].data = []; paretoChart.update(); }
             if(pieChart) { pieChart.data.labels = []; pieChart.data.datasets[0].data = []; pieChart.update(); }
@@ -590,14 +646,27 @@
         }
 
         function initCharacterizationCharts() {
+            const commonOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                onClick: (e, elements, chart) => {
+                    if (elements && elements.length > 0) {
+                        const index = elements[0].index;
+                        const label = chart.data.labels[index];
+                        // Mapeo inverso si es necesario o uso directo del label
+                        // Filtrar tabla
+                        applyCategoryFilter(label, null); 
+                    }
+                }
+            };
+
             // Dona (Izquierda)
             const ctxDona = document.getElementById('characterizationChart').getContext('2d');
             characterizationChart = new Chart(ctxDona, {
                 type: 'doughnut',
                 data: { labels: [], datasets: [{ data: [], backgroundColor: [] }] },
                 options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
+                    ...commonOptions,
                     plugins: { legend: { position: 'right' } }
                 }
             });
@@ -608,9 +677,8 @@
                 type: 'bar',
                 data: { labels: [], datasets: [{ data: [], backgroundColor: [] }] },
                 options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } }, // No leyenda porque los colores y etiquetas explican
+                    ...commonOptions,
+                    plugins: { legend: { display: false } },
                     scales: {
                         y: { beginAtZero: true, title: { display: true, text: 'N° Ítems' } }
                     }
@@ -661,16 +729,6 @@
         }
 
         // --- HELPERS ---
-        function initLogo() {
-            const c = document.createElement('canvas'); c.width=200; c.height=200;
-            const x = c.getContext('2d'); x.fillStyle='#FFF'; x.beginPath();
-            x.moveTo(100,10); x.bezierCurveTo(200,10,200,100,100,190); x.bezierCurveTo(0,100,0,10,100,10); x.fill();
-            x.globalCompositeOperation='destination-out'; x.fillRect(80,50,40,100); x.fillRect(50,80,100,40);
-            Logo_HUHMP_Blanco = c.toDataURL();
-            document.getElementById('Logo_HUHMP_Blanco_Preview').src = Logo_HUHMP_Blanco;
-        }
-        function updateSpecificLogo(i){ if(i.files[0]){ const r=new FileReader(); r.onload=e=>{Logo_HUHMP_Blanco=e.target.result; document.getElementById('Logo_HUHMP_Blanco_Preview').src=Logo_HUHMP_Blanco;}; r.readAsDataURL(i.files[0]); } }
-
         function handlePharmacyFileUpload(event) {
             const file = event.target.files[0];
             const status = document.getElementById('upload-status-text');
@@ -732,7 +790,7 @@
 
         function normalizeHeader(h) { return h ? h.toString().toLowerCase().trim().replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ') : ''; }
 
-        window.renderInventoryTable = function(sheetName, searchQuery = "") {
+        window.renderInventoryTable = function(sheetName, searchQuery = "", paretoFilter = null) {
             const tbody = document.getElementById('inventory-table-body');
             tbody.innerHTML = '';
             
@@ -746,6 +804,8 @@
             }
 
             let data = window.sheetsData[sheetName];
+            
+            // Filtro por Búsqueda
             if (searchQuery) {
                 const query = searchQuery.toLowerCase().trim();
                 data = data.filter(row => {
@@ -754,12 +814,21 @@
                     return codigo.includes(query) || desc.includes(query);
                 });
             }
+            
+            // Filtro por Pareto (Interacción con Chart de Sección II)
+            if (paretoFilter && paretoFilter !== 'ALL') {
+                data = data.filter(row => {
+                    const paretoVal = (getColumnVal(row, ['pareto', 'páreto']) || '').toString().toUpperCase().trim();
+                    return paretoVal === paretoFilter;
+                });
+            }
+
             updateDynamicAnalysisChart(data);
 
             const displayData = data.slice(0, 500); 
 
             if (displayData.length === 0) {
-                 tbody.innerHTML = '<tr><td colspan="11" class="px-4 py-8 text-center text-slate-400">No se encontraron ítems que coincidan con la búsqueda.</td></tr>';
+                 tbody.innerHTML = '<tr><td colspan="11" class="px-4 py-8 text-center text-slate-400">No se encontraron ítems que coincidan con los filtros.</td></tr>';
                  return;
             }
 
@@ -801,7 +870,14 @@
             
             // UI Toggle
             document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active', 'scale-105', 'opacity-100'));
-            if(btnElement) btnElement.classList.add('active', 'scale-105', 'opacity-100');
+            // Si viene de un botón (y no del gráfico), resalta el botón
+            if (btnElement) {
+                btnElement.classList.add('active', 'scale-105', 'opacity-100');
+            } else {
+                // Si viene del gráfico, busca el botón correspondiente y actívalo
+                const targetBtn = Array.from(document.querySelectorAll('.filter-btn')).find(b => b.textContent.includes(category));
+                if(targetBtn) targetBtn.classList.add('active', 'scale-105', 'opacity-100');
+            }
             
             const currentBook = document.getElementById('char-book-select').value;
             if(currentBook) renderCharacterizationTable(currentBook);
@@ -865,12 +941,11 @@
                 // 3. COSTO 2026 = COSTO TOTAL * INCREMENTO 2026
                 const costo2026 = costoTotal * (1 + (incrementPercent / 100));
 
-                // 4. TARIFA DE VENTA 2026 = PRECIO 2025 * INCREMENTO 2026
-                const tarifaVenta2026 = precio2025 * (1 + (incrementPercent / 100));
-
                 let category = "SIN FRECUENCIA";
                 let badgeClass = "bg-slate-100 text-slate-500";
+                let tarifaVenta2026 = 0;
 
+                // Lógica de Categorización
                 if (pareto === 'A' && identA === 'SI') { category = "BLACK"; badgeClass = "bg-cat-black"; }
                 else if (pareto === 'A') { category = "ELITE"; badgeClass = "bg-cat-elite"; }
                 else if (pareto === 'B') { category = "ORO"; badgeClass = "bg-cat-oro"; }
@@ -880,6 +955,17 @@
                 
                 if (desc && desc.toLowerCase().includes('regulado')) { category = "REGULADOS"; badgeClass = "bg-cat-regulados"; }
                 
+                // 4. TARIFA DE VENTA 2026
+                // "las tarifas de venta en la columna Tarifa Venta 2026 para los productos no regulados será la de precio 2026"
+                // Interpretación: 
+                // REGULADOS: Mantienen Precio 2025.
+                // NO REGULADOS: Precio 2026 (Precio 2025 + Incremento)
+                if (category === "REGULADOS") {
+                    tarifaVenta2026 = precio2025; // Regulado no sube
+                } else {
+                    tarifaVenta2026 = precio2025 * (1 + (incrementPercent / 100)); // Precio 2026 proyectado
+                }
+
                 if (categoryCounts.hasOwnProperty(category)) {
                     categoryCounts[category]++;
                 } else {
@@ -896,6 +982,9 @@
                     _badgeClass: badgeClass 
                 };
             });
+            
+            // Guardar para exportación
+            currentExportData = processedData;
 
             // 2.1 ACTUALIZAR BOTONES CON CONTEOS
             renderFilterButtons(categoryCounts, processedData.length);
@@ -933,6 +1022,41 @@
             }).join('');
             
             tbody.innerHTML = html || '<tr><td colspan="100%" class="px-4 py-8 text-center text-slate-400">No hay productos en esta categoría.</td></tr>';
+        }
+
+        window.downloadCharacterizationExcel = function() {
+            if (!currentExportData || currentExportData.length === 0) {
+                alert("No hay datos para exportar. Cargue un archivo primero.");
+                return;
+            }
+
+            // Preparar datos planos para Excel
+            // Se debe incluir columnas originales + calculadas
+            const exportArray = currentExportData.map(d => {
+                const newRow = {};
+                
+                // 1. Columnas originales (Keys que no empiezan con _)
+                Object.keys(d).forEach(key => {
+                    if (!key.startsWith('_')) newRow[key] = d[key];
+                });
+
+                // 2. Columnas Calculadas
+                newRow['Costos Indirectos'] = d._costosIndirectos;
+                newRow['Costo Total'] = d._costoTotal;
+                newRow['Costo Proyectado 2026'] = d._costo2026;
+                newRow['Tarifa Venta 2026'] = d._tarifaVenta2026;
+                newRow['Categoría Final'] = d._category;
+
+                return newRow;
+            });
+
+            const ws = XLSX.utils.json_to_sheet(exportArray);
+            const wb = XLSX.utils.book_new();
+            // Nombre de hoja seguro
+            const sheetNameSafe = (document.getElementById('char-book-select').value || "Datos").substring(0, 30);
+            XLSX.utils.book_append_sheet(wb, ws, sheetNameSafe);
+            
+            XLSX.writeFile(wb, `Caracterizacion_${sheetNameSafe}_2026.xlsx`);
         }
 
         function renderFilterButtons(counts, total) {
@@ -999,12 +1123,13 @@
             const sheetName = document.getElementById('inventory-book-select').value;
             const query = document.getElementById('inventory-search-input').value;
             if(!sheetName) { alert("Seleccione un libro primero."); return; }
-            renderInventoryTable(sheetName, query);
+            renderInventoryTable(sheetName, query, currentParetoFilter);
         }
 
         window.clearInventorySearch = function() {
             document.getElementById('inventory-search-input').value = "";
             const sheetName = document.getElementById('inventory-book-select').value;
+            currentParetoFilter = 'ALL'; // Resetear filtros también
             renderInventoryTable(sheetName, "");
         }
 
@@ -1187,11 +1312,40 @@
         const colors = ['#312782', '#008041', '#EC268F', '#fbbf24', '#60a5fa', '#94a3b8'];
 
         function initCharts() {
+            const commonOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                onClick: (e, elements, chart) => {
+                    if (elements && elements.length > 0) {
+                        const index = elements[0].index;
+                        const label = chart.data.labels[index];
+                        // Filtra la tabla de Inventario (Sección III)
+                        currentParetoFilter = label;
+                        const activeBook = document.getElementById('inventory-book-select').value;
+                        if(activeBook) {
+                            renderInventoryTable(activeBook, "", label);
+                            // Scroll suave a la tabla
+                            document.getElementById('section-detalle-items').scrollIntoView({behavior: 'smooth'});
+                        }
+                    }
+                }
+            };
+
             const ctx1 = document.getElementById('paretoChart').getContext('2d');
-            paretoChart = new Chart(ctx1, { type: 'bar', data: { labels: [], datasets: [{ label: 'Conteo', data: [], backgroundColor: colors }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } });
+            paretoChart = new Chart(ctx1, { 
+                type: 'bar', 
+                data: { labels: [], datasets: [{ label: 'Conteo', data: [], backgroundColor: colors }] }, 
+                options: { ...commonOptions, plugins: { legend: { display: false } } } 
+            });
+            
             const ctx2 = document.getElementById('paretoPieChart').getContext('2d');
-            pieChart = new Chart(ctx2, { type: 'doughnut', data: { labels: [], datasets: [{ data: [], backgroundColor: colors }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } } });
+            pieChart = new Chart(ctx2, { 
+                type: 'doughnut', 
+                data: { labels: [], datasets: [{ data: [], backgroundColor: colors }] }, 
+                options: { ...commonOptions, plugins: { legend: { position: 'right' } } } 
+            });
         }
+
         function updateChartsData(l, c) {
             if(paretoChart) { paretoChart.data.labels = l; paretoChart.data.datasets[0].data = c; paretoChart.update(); }
             if(pieChart) { pieChart.data.labels = l; pieChart.data.datasets[0].data = c; pieChart.update(); }
@@ -1237,54 +1391,6 @@
         window.upSig = (i,f,v) => { window.signatures[i][f]=v; if(window.saveDataToFirebase) window.saveDataToFirebase(); };
         window.addSignature = () => { window.signatures.push({role:'REVISÓ',name:'',cargo:''}); renderSignatures(); if(window.saveDataToFirebase) window.saveDataToFirebase(); };
         window.rmSig = (i) => { if(confirm('¿Borrar?')){ window.signatures.splice(i,1); renderSignatures(); if(window.saveDataToFirebase) window.saveDataToFirebase(); } };
-
-        window.generatePDF = () => {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            const pageWidth = doc.internal.pageSize.getWidth();
-            
-            doc.setFillColor(49, 39, 130); doc.rect(0, 0, pageWidth, 40, 'F');
-            doc.setTextColor(255); doc.setFontSize(14); doc.text("ESE HOSPITAL UNIVERSITARIO", 15, 18);
-            doc.text("HERNANDO MONCALEANO PERDOMO", 15, 25);
-            try { doc.addImage(Logo_HUHMP_Blanco, 'PNG', pageWidth-35, 10, 20, 20); } catch(e){}
-
-            let y = 50;
-            doc.setTextColor(49, 39, 130); doc.setFontSize(12); doc.text("I. RESUMEN EJECUTIVO", 15, y);
-            y += 10;
-            const rows = window.productGroups.map(g => [g.name, g.count, formatMoney(g.cost)]);
-            doc.autoTable({ startY: y, head: [['Libro', 'Items', 'Costo']], body: rows });
-            
-            y = doc.lastAutoTable.finalY + 15;
-            doc.text("II. GRÁFICA PARETO", 15, y);
-            try { doc.addImage(document.getElementById('paretoChart').toDataURL('image/png'), 'PNG', 15, y+5, 180, 80); } catch(e){}
-
-            y += 90;
-            doc.text("III. DETALLE DE ÍTEMS (Muestra Parcial)", 15, y);
-            doc.setFontSize(10); doc.setTextColor(100);
-            doc.text("El detalle completo de ítems se encuentra en el anexo digital.", 15, y+7);
-            
-            y += 20;
-            doc.setTextColor(49, 39, 130); doc.setFontSize(12); 
-            doc.text("IV. COSTOS INDIRECTOS", 15, y);
-            y += 10;
-            const costData = window.costStructure.map(c => [c.name, c.percent + "%"]);
-            doc.autoTable({ startY: y, head: [['Rubro', '%']], body: costData });
-            
-            y = doc.lastAutoTable.finalY + 20;
-            doc.text("V. CARACTERIZACIÓN DE BIENES", 15, y);
-            doc.setFontSize(10); doc.setTextColor(100);
-            doc.text("Clasificación avanzada de bienes (BLACK, ELITE, ORO, ETC.) según proyección 2026.", 15, y+7);
-
-            y += 20;
-            doc.setTextColor(49, 39, 130); doc.setFontSize(12);
-            doc.text("VI. APROBACIONES", 15, y);
-            y += 20;
-            window.signatures.forEach((sig, i) => {
-                doc.text(`${sig.role}: ${sig.name} (${sig.cargo})`, 15, y + (i*10));
-            });
-
-            doc.save('Informe_Tarifas_HUHMP.pdf');
-        }
     </script>
 </body>
 </html>
