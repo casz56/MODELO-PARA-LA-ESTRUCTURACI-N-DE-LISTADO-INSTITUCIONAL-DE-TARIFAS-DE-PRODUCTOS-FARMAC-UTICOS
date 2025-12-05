@@ -662,7 +662,7 @@
                         <div class="flex flex-col sm:flex-row justify-between items-center mb-4 border-b pb-2 gap-4">
                             <h3 class="font-bold text-principal text-lg"><i class="fas fa-book mr-2"></i>${sheetName}</h3>
                             
-                            <div class="flex items-center gap-4 bg-slate-50 p-2 rounded-lg">
+                            <div class="flex flex-wrap items-center gap-4 bg-slate-50 p-2 rounded-lg">
                                 <div class="flex items-center gap-2">
                                     <label class="text-xs font-bold text-slate-600 uppercase">Incremento 2026 (%):</label>
                                     <input type="number" id="increment-${safeId}" value="10" 
@@ -672,6 +672,11 @@
                                 <button onclick="window.saveSheetAnalysis('${sheetName.replace(/'/g, "\\'")}', '${safeId}')" 
                                         class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow text-xs font-bold flex items-center gap-2 transition-transform active:scale-95">
                                     <i class="fas fa-save"></i> Guardar Configuración
+                                </button>
+                                <!-- BOTÓN DE DESCARGA EXCEL PARA SECCIÓN VII -->
+                                <button onclick="window.downloadSheetAnalysisExcel('${sheetName.replace(/'/g, "\\'")}')" 
+                                        class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow text-xs font-bold flex items-center gap-2 transition-transform active:scale-95">
+                                    <i class="fas fa-file-excel"></i> Descargar Libro
                                 </button>
                                 <span id="status-${safeId}" class="text-xs font-bold text-slate-400 italic">Sin guardar</span>
                             </div>
@@ -687,6 +692,7 @@
                                         <th class="px-4 py-2 text-right">Tarifa 2026</th>
                                         <th class="px-4 py-2 text-right bg-blue-50 font-bold border-l border-blue-200">Margen ($)</th>
                                         <th class="px-4 py-2 text-right">Var %</th>
+                                        <th class="px-4 py-2 text-center bg-yellow-100 text-yellow-900 border-l border-yellow-300">Observación</th>
                                         <th class="px-4 py-2 text-center">Categoría</th>
                                     </tr>
                                 </thead>
@@ -711,7 +717,7 @@
             const increment = parseFloat(inputInc.value) || 0;
             const totalIndirect = window.costStructure.reduce((s, i) => s + i.percent, 0);
 
-            if (!rawData) return;
+            if (!rawData) { tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-slate-400">Datos no disponibles para este libro.</td></tr>'; return; }
             
             // LÓGICA DE NEGOCIO: Detectar hoja Regulada
             const isRegulatedSheet = sheetName.toUpperCase().includes('REGULADOS');
@@ -758,6 +764,7 @@
                 const margen = tarifa26 - costoTotal;
                 const varAbs = tarifa26 - precio2025;
                 const varRel = precio2025 !== 0 ? (varAbs / precio2025) * 100 : 0;
+                const observacion = margen < 0 ? 'Se recomienda validar el ítem' : '';
 
                 return {
                     codigo: getColumnVal(row, ['código', 'codigo']),
@@ -767,11 +774,13 @@
                     margen,
                     varRel,
                     category,
-                    badgeClass
+                    badgeClass,
+                    observacion // NUEVO CAMPO
                 };
             });
-
-            tbody.innerHTML = processed.slice(0, 100).map(r => `
+            
+            // ELIMINACIÓN DE .slice(0, 100) para mostrar todos los ítems
+            tbody.innerHTML = processed.map(r => `
                 <tr class="hover:bg-slate-50">
                     <td class="px-4 py-2 font-mono text-slate-600">${r.codigo || '-'}</td>
                     <td class="px-4 py-2 truncate max-w-xs" title="${r.desc}">${String(r.desc).substring(0,40)}</td>
@@ -779,6 +788,7 @@
                     <td class="px-4 py-2 text-right font-bold text-blue-800">${formatMoney(r.tarifa26)}</td>
                     <td class="px-4 py-2 text-right font-bold ${r.margen >= 0 ? 'text-green-600' : 'text-red-600'} bg-slate-50 border-l border-slate-200">${formatMoney(r.margen)}</td>
                     <td class="px-4 py-2 text-right text-green-600 text-[10px]">${r.varRel.toFixed(1)}%</td>
+                    <td class="px-4 py-2 text-xs text-center ${r.margen < 0 ? 'bg-red-100 text-red-700 font-bold' : 'text-slate-500'}">${r.observacion}</td>
                     <td class="px-4 py-2 text-center"><span class="px-2 py-0.5 rounded text-[10px] ${r.badgeClass}">${r.category}</span></td>
                 </tr>
             `).join('');
@@ -789,6 +799,71 @@
                 statusEl.className = "text-xs font-bold text-yellow-500 italic";
             }
         }
+
+        window.downloadSheetAnalysisExcel = function(sheetName) {
+            const rawData = window.sheetsData[sheetName];
+            if (!rawData) { alert(`No hay datos cargados para el libro: ${sheetName}`); return; }
+
+            const totalIndirect = window.costStructure.reduce((s, i) => s + i.percent, 0);
+            const increment = parseFloat(document.getElementById(`increment-${sheetName.replace(/[^a-zA-Z0-9]/g, '_')}`).value) || 0;
+            const isRegulatedSheet = sheetName.toUpperCase().includes('REGULADOS');
+
+            const exportArray = rawData.map(row => {
+                const desc = getColumnVal(row, ['descripción', 'descripcion']);
+                const valCompra = cleanCurrency(getColumnVal(row, ['valor máximo', 'valor maximo', 'ultimas vigencias'])); 
+                const precio2025 = cleanCurrency(getColumnVal(row, ['precio 2025'])); 
+                const precio2026_file = cleanCurrency(getColumnVal(row, ['precio 2026', 'tarifa 2026', 'valor 2026', 'proyección 2026', 'venta 2026', 'precio regulado', 'valor regulado', 'tope', 'regulado']));
+                const pareto = (getColumnVal(row, ['pareto', 'páreto']) || 'N/A').toUpperCase().trim();
+                const identA = (getColumnVal(row, ['identificación', 'identificacion', 'a+']) || '').toUpperCase();
+
+                const costosIndirectos = valCompra * (totalIndirect / 100);
+                const costoTotal = valCompra + costosIndirectos;
+                
+                let category = "CLÁSICOS";
+                if (pareto === 'A' && identA === 'SI') { category = "BLACK"; }
+                else if (pareto === 'A') { category = "ELITE"; }
+                else if (pareto === 'B') { category = "ORO"; }
+                else if (pareto === 'C') { category = "PLATA"; }
+                else if (valCompra === 0) { category = "PRODUCTOS SIN FRECUENCIA DE USO"; }
+
+                const isRegulated = isRegulatedSheet || (desc && desc.toLowerCase().includes('regulado'));
+                if (isRegulated) { category = "REGULADOS"; }
+
+                let tarifa26 = 0;
+                if (isRegulated) {
+                     // Tarifa fija de archivo o precio 2025 si no hay precio 2026
+                     tarifa26 = (precio2026_file > 0) ? Math.round(precio2026_file) : Math.round(precio2025);
+                } else {
+                    tarifa26 = Math.round(precio2025 * (1 + (increment / 100)));
+                }
+
+                const margen = tarifa26 - costoTotal;
+                const varAbs = tarifa26 - precio2025;
+                const varRel = precio2025 !== 0 ? (varAbs / precio2025) : 0; // Exportar como fracción para % en Excel
+                const observacion = margen < 0 ? 'Se recomienda validar el ítem' : '';
+
+                // Crear fila con todas las columnas originales + análisis
+                const newRow = { ...row };
+                
+                // Agregar columnas calculadas
+                newRow['Costos Indirectos (%)'] = totalIndirect;
+                newRow['Costo Total'] = costoTotal;
+                newRow['Tarifa Venta 2026'] = tarifa26;
+                newRow['Margen Neto ($)'] = margen;
+                newRow['Variación Relativa 25-26 (%)'] = varRel; // Exportar como valor decimal
+                newRow['Categoría Final'] = category;
+                newRow['Observación de Margen'] = observacion;
+                
+                return newRow;
+            });
+
+            const ws = XLSX.utils.json_to_sheet(exportArray);
+            const wb = XLSX.utils.book_new();
+            const sheetNameSafe = sheetName.substring(0, 30);
+            XLSX.utils.book_append_sheet(wb, ws, sheetNameSafe);
+            XLSX.writeFile(wb, `Analisis_Tarifas_${sheetNameSafe}_2026.xlsx`);
+        }
+
 
         window.saveSheetAnalysis = function(sheetName, safeId) {
             const inputInc = document.getElementById(`increment-${safeId}`);
@@ -1082,6 +1157,10 @@
             consecutiveCounter++;
             const consecutive = String(consecutiveCounter).padStart(6, '0');
             const currentDate = new Date().toLocaleString("es-CO");
+            
+            // Calculamos el total indirecto una sola vez
+            const totalInd = window.costStructure.reduce((a,b) => a + b.percent, 0).toFixed(2);
+
 
             // --- HELPER: HEADER ---
             const drawHeader = (doc) => {
@@ -1126,7 +1205,7 @@
             doc.setFillColor(240, 240, 245); doc.rect(margins.left, currentY - 5, pageWidth - 30, 8, 'F');
             doc.setTextColor(49, 39, 130); doc.setFont("helvetica", "bold"); doc.setFontSize(11);
             doc.text("ESTRUCTURA DE COSTOS INDIRECTOS", margins.left + 2, currentY); currentY += 5;
-            const costBody = window.costStructure.map(c => [c.name, c.percent + " %"]); const totalInd = window.costStructure.reduce((a,b) => a + b.percent, 0).toFixed(2); costBody.push(['TOTAL RECUPERACIÓN INDIRECTA', totalInd + " %"]);
+            const costBody = window.costStructure.map(c => [c.name, c.percent + " %"]); costBody.push(['TOTAL RECUPERACIÓN INDIRECTA', totalInd + " %"]);
             doc.autoTable({ startY: currentY, head: [['Rubro de Costo', 'Porcentaje Asignado']], body: costBody, theme: 'grid', tableWidth: 100, headStyles: { fillColor: [49, 39, 130], textColor: 255 }, didParseCell: function(data) { if (data.row.index === costBody.length - 1) data.cell.styles.fontStyle = 'bold'; }, margin: { left: margins.left } }); currentY = doc.lastAutoTable.finalY + 15;
 
             // --- SECCIÓN: CARACTERIZACIÓN (ANTIGUO V) ---
@@ -1212,6 +1291,7 @@
             doc.setTextColor(49, 39, 130); doc.setFont("helvetica", "bold"); doc.setFontSize(11);
             doc.text("CONCLUSIONES DEL MODELO", margins.left + 2, currentY); currentY += 10;
             doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(20);
+            // Reutiliza totalInd calculado al inicio de la función
             const conclusions = [ `1. SOSTENIBILIDAD FINANCIERA: La estructura de costos definida incorpora un margen de recuperación indirecta del ${totalInd}%, distribuido en mano de obra, logística y administración.`, "", `2. EFICIENCIA PARETO Y FLUJO DE CAJA: El análisis evidencia que la gestión de inventarios debe focalizarse estrictamente en los productos Tipo A.`, "", `3. IMPACTO TARIFARIO Y REGULACIÓN: La caracterización de bienes permite discriminar entre productos regulados y de mercado libre.` ];
             doc.text(conclusions, margins.left, currentY, { maxWidth: pageWidth - 30, align: "justify" }); currentY += 50;
 
@@ -1334,7 +1414,7 @@
             
             if (currentCategoryFilter !== 'ALL') { processedData = processedData.filter(d => d._category === currentCategoryFilter); }
             
-            const displayData = processedData.slice(0, 500);
+            const displayData = processedData.slice(0, 500); // Mantenemos un slice para la visualización por defecto en la Sec. V si el consolidated es muy grande, aunque la exportación sea completa.
             const html = displayData.map(d => {
                 let rowHTML = '<tr class="hover:bg-slate-50 transition-colors border-b border-slate-100">';
                 originalHeaders.forEach(h => { let val = d[h]; if (typeof val === 'number' && val > 1000) val = formatMoney(val); rowHTML += `<td class="px-4 py-2 truncate max-w-xs text-xs border-r border-slate-50" title="${val}">${val}</td>`; });
@@ -1356,13 +1436,20 @@
             const exportArray = currentExportData.map(d => {
                 const newRow = {};
                 Object.keys(d).forEach(key => { if (!key.startsWith('_')) newRow[key] = d[key]; });
+                
+                // Calculamos el margen y la observación para esta exportación también
+                const margen = d._tarifaVenta2026 - d._costoTotal;
+                const observacion = margen < 0 ? 'Se recomienda validar el ítem' : '';
+
                 newRow['Costos Indirectos'] = d._costosIndirectos;
                 newRow['Costo Total'] = d._costoTotal;
                 newRow['Costo Proyectado 2026'] = d._costo2026;
                 newRow['Tarifa Venta 2026'] = d._tarifaVenta2026;
+                newRow['Margen Neto ($)'] = margen; // Añadimos Margen
                 newRow['Variación Absoluta 25-26 ($)'] = d._variacionAbsoluta;
                 newRow['Variación Relativa 25-26 (%)'] = d._variacionRelativa / 100; 
                 newRow['Categoría Final'] = d._category;
+                newRow['Observación'] = observacion; // Añadimos Observación
                 return newRow;
             });
             const ws = XLSX.utils.json_to_sheet(exportArray);
