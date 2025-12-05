@@ -685,6 +685,7 @@
                                         <th class="px-4 py-2">Descripción</th>
                                         <th class="px-4 py-2 text-right">Costo Total</th>
                                         <th class="px-4 py-2 text-right">Tarifa 2026</th>
+                                        <th class="px-4 py-2 text-right bg-blue-50 font-bold border-l border-blue-200">Margen ($)</th>
                                         <th class="px-4 py-2 text-right">Var %</th>
                                         <th class="px-4 py-2 text-center">Categoría</th>
                                     </tr>
@@ -711,12 +712,17 @@
             const totalIndirect = window.costStructure.reduce((s, i) => s + i.percent, 0);
 
             if (!rawData) return;
+            
+            // LÓGICA DE NEGOCIO: Detectar hoja Regulada
+            const isRegulatedSheet = sheetName.toUpperCase().includes('REGULADOS');
 
             // Procesar datos (similar a Sección V pero local)
             const processed = rawData.map(row => {
                 const desc = getColumnVal(row, ['descripción', 'descripcion']);
                 const valCompra = cleanCurrency(getColumnVal(row, ['valor máximo', 'valor maximo', 'ultimas vigencias'])); 
                 const precio2025 = cleanCurrency(getColumnVal(row, ['precio 2025'])); 
+                // NUEVO: Ampliación de búsqueda de la columna 2026
+                const precio2026 = cleanCurrency(getColumnVal(row, ['precio 2026', 'tarifa 2026', 'valor 2026', 'proyección 2026', 'venta 2026', 'precio regulado', 'valor regulado', 'tope', 'regulado']));
                 
                 const pareto = (getColumnVal(row, ['pareto', 'páreto']) || 'N/A').toUpperCase().trim();
                 const identA = (getColumnVal(row, ['identificación', 'identificacion', 'a+']) || '').toUpperCase();
@@ -733,12 +739,23 @@
                 else if (pareto === 'C') { category = "PLATA"; badgeClass = "bg-cat-plata"; }
                 else if (valCompra === 0) { category = "PRODUCTOS SIN FRECUENCIA DE USO"; badgeClass = "bg-cat-sinfreq"; }
                 else { category = "CLÁSICOS"; badgeClass = "bg-cat-clasicos"; }
-                if (desc && desc.toLowerCase().includes('regulado')) { category = "REGULADOS"; badgeClass = "bg-cat-regulados"; }
+                
+                // Si la hoja es Regulada, forzar la categoría
+                if (isRegulatedSheet || (desc && desc.toLowerCase().includes('regulado'))) { 
+                    category = "REGULADOS"; 
+                    badgeClass = "bg-cat-regulados"; 
+                }
 
                 let tarifa26 = 0;
-                if (category === "REGULADOS") tarifa26 = precio2025;
-                else tarifa26 = precio2025 * (1 + (increment / 100));
-
+                // LÓGICA DE NEGOCIO AJUSTADA: 
+                // Si es REGULADO: Priorizar valor de columna "Precio 2026". Si no existe, usar Precio 2025 (incremento 0).
+                if (category === "REGULADOS") {
+                    tarifa26 = (precio2026 > 0) ? Math.round(precio2026) : Math.round(precio2025);
+                } else {
+                    tarifa26 = Math.round(precio2025 * (1 + (increment / 100)));
+                }
+                
+                const margen = tarifa26 - costoTotal;
                 const varAbs = tarifa26 - precio2025;
                 const varRel = precio2025 !== 0 ? (varAbs / precio2025) * 100 : 0;
 
@@ -747,6 +764,7 @@
                     desc: desc,
                     costoTotal,
                     tarifa26,
+                    margen,
                     varRel,
                     category,
                     badgeClass
@@ -759,6 +777,7 @@
                     <td class="px-4 py-2 truncate max-w-xs" title="${r.desc}">${String(r.desc).substring(0,40)}</td>
                     <td class="px-4 py-2 text-right">${formatMoney(r.costoTotal)}</td>
                     <td class="px-4 py-2 text-right font-bold text-blue-800">${formatMoney(r.tarifa26)}</td>
+                    <td class="px-4 py-2 text-right font-bold ${r.margen >= 0 ? 'text-green-600' : 'text-red-600'} bg-slate-50 border-l border-slate-200">${formatMoney(r.margen)}</td>
                     <td class="px-4 py-2 text-right text-green-600 text-[10px]">${r.varRel.toFixed(1)}%</td>
                     <td class="px-4 py-2 text-center"><span class="px-2 py-0.5 rounded text-[10px] ${r.badgeClass}">${r.category}</span></td>
                 </tr>
@@ -778,6 +797,9 @@
             const totalIndirect = window.costStructure.reduce((s, i) => s + i.percent, 0);
             const rawData = window.sheetsData[sheetName];
             
+            // LÓGICA DE NEGOCIO: Detectar hoja Regulada
+            const isRegulatedSheet = sheetName.toUpperCase().includes('REGULADOS');
+            
             let totalCost = 0;
             let totalRevenue26 = 0;
             let items = rawData.length;
@@ -785,16 +807,23 @@
             rawData.forEach(row => {
                 const valCompra = cleanCurrency(getColumnVal(row, ['valor máximo', 'valor maximo', 'ultimas vigencias'])); 
                 const precio2025 = cleanCurrency(getColumnVal(row, ['precio 2025'])); 
+                // NUEVO: Extraer precio 2026 para guardado
+                const precio2026 = cleanCurrency(getColumnVal(row, ['precio 2026', 'tarifa 2026', 'valor 2026', 'proyección 2026', 'venta 2026', 'precio regulado', 'valor regulado', 'tope', 'regulado']));
+
                 const desc = getColumnVal(row, ['descripción', 'descripcion']);
 
                 const costosIndirectos = valCompra * (totalIndirect / 100);
                 const costoTotal = valCompra + costosIndirectos;
                 
-                let isRegulated = desc && desc.toLowerCase().includes('regulado');
+                let isRegulated = isRegulatedSheet || (desc && desc.toLowerCase().includes('regulado'));
                 
                 let tarifa26 = 0;
-                if (isRegulated) tarifa26 = precio2025;
-                else tarifa26 = precio2025 * (1 + (increment / 100));
+                // LÓGICA DE PERSISTENCIA: Misma lógica que visualización
+                if (isRegulated) {
+                     tarifa26 = (precio2026 > 0) ? Math.round(precio2026) : Math.round(precio2025);
+                } else {
+                    tarifa26 = Math.round(precio2025 * (1 + (increment / 100)));
+                }
 
                 totalCost += costoTotal;
                 totalRevenue26 += tarifa26;
@@ -1082,46 +1111,38 @@
             doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.setTextColor(50);
             doc.text("El presente documento detalla la metodología, análisis de datos y proyección tarifaria para la vigencia 2026, conforme a los lineamientos institucionales y regulatorios.", margins.left, currentY, { maxWidth: pageWidth - 30 }); currentY += 15;
 
-            // --- SECCIÓN I: RESUMEN DE PRODUCTOS ---
+            // --- SECCIÓN: RESUMEN DE PRODUCTOS (ANTIGUO I) ---
             doc.setFillColor(240, 240, 245); doc.rect(margins.left, currentY - 5, pageWidth - 30, 8, 'F');
             doc.setTextColor(49, 39, 130); doc.setFont("helvetica", "bold"); doc.setFontSize(11);
-            doc.text("I. RESUMEN DE PRODUCTOS POR TIPO", margins.left + 2, currentY); currentY += 5;
+            doc.text("RESUMEN DE PRODUCTOS POR TIPO", margins.left + 2, currentY); currentY += 5;
             const summaryBody = window.productGroups.map(g => [ g.name, g.count, formatMoney(g.cost), formatMoney(g.revenue) ]);
             doc.autoTable({ startY: currentY, head: [['Libro / Fuente', 'Cant. Ítems', 'Costo Total Inventario', 'Venta Proyectada']], body: summaryBody, theme: 'striped', headStyles: { fillColor: [49, 39, 130], textColor: 255, fontSize: 8 }, bodyStyles: { fontSize: 8 }, columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' } }, margin: { left: margins.left, right: margins.right } });
             currentY = doc.lastAutoTable.finalY + 15;
 
-            // --- SECCIÓN II: PARETO ---
-            doc.setFillColor(240, 240, 245); doc.rect(margins.left, currentY - 5, pageWidth - 30, 8, 'F');
-            doc.setTextColor(49, 39, 130); doc.setFont("helvetica", "bold"); doc.setFontSize(11);
-            doc.text("II. ANÁLISIS DE PARETO", margins.left + 2, currentY); currentY += 10;
-            try { const canvas = document.getElementById('paretoChart'); if (canvas) { const imgData = canvas.toDataURL('image/png'); const imgWidth = 120; const imgHeight = 60; doc.addImage(imgData, 'PNG', margins.left, currentY, imgWidth, imgHeight); let counts = {A:0, B:0, C:0}; Object.values(window.sheetsData).forEach(sheet => { sheet.forEach(row => { let p = getColumnVal(row, ['pareto', 'páreto']); if(p) { p = p.toString().toUpperCase().trim(); if(counts[p] !== undefined) counts[p]++; } }); }); const totalPareto = counts.A + counts.B + counts.C || 1; doc.autoTable({ startY: currentY, head: [['Tipo', 'Ítems', 'Part. %']], body: [ ['A (Vitales)', counts.A, ((counts.A/totalPareto)*100).toFixed(1)+'%'], ['B (Esenciales)', counts.B, ((counts.B/totalPareto)*100).toFixed(1)+'%'], ['C (No Esenciales)', counts.C, ((counts.C/totalPareto)*100).toFixed(1)+'%'] ], theme: 'grid', margin: { left: margins.left + 130 }, tableWidth: 50, headStyles: { fillColor: [100, 100, 100], fontSize: 8 }, bodyStyles: { fontSize: 8 } }); currentY += 70; } } catch(e) { console.error("Error Pareto img", e); }
+            // (SECCIONES II Y III ELIMINADAS)
 
-            // --- SECCIÓN III: DETALLE DE ÍTEMS ---
-            if (currentY > pageHeight - 50) { doc.addPage(); drawHeader(doc); currentY = margins.top; }
-            doc.setFillColor(240, 240, 245); doc.rect(margins.left, currentY - 5, pageWidth - 30, 8, 'F');
-            doc.setTextColor(49, 39, 130); doc.setFont("helvetica", "bold"); doc.setFontSize(11);
-            doc.text("III. DETALLE DE ÍTEMS FARMACÉUTICOS (Muestra)", margins.left + 2, currentY); currentY += 5;
-            let selectedSheet = document.getElementById('inventory-book-select').value; if(!selectedSheet && window.productGroups.length > 0) selectedSheet = window.productGroups[0].name; let itemsData = []; if(selectedSheet && window.sheetsData[selectedSheet]) { doc.setFontSize(8); doc.setTextColor(100); doc.text(`Fuente: ${selectedSheet} | Mostrando primeros 200 registros por optimización.`, margins.left, currentY + 4); currentY += 6; itemsData = window.sheetsData[selectedSheet].slice(0, 200).map(row => [ getColumnVal(row, ['código', 'codigo']), String(getColumnVal(row, ['descripción', 'descripcion'])).substring(0, 40), formatMoney(cleanCurrency(getColumnVal(row, ['precio 2025']))), getColumnVal(row, ['unidades', 'n° unidades']), formatMoney(cleanCurrency(getColumnVal(row, ['valor máximo', 'valor maximo']))), getColumnVal(row, ['pareto', 'páreto']) ]); } else { itemsData = [['-', 'No hay datos seleccionados o cargados', '-', '-', '-', '-']]; }
-            doc.autoTable({ startY: currentY, head: [['Código', 'Descripción', 'Precio 2025', 'Unds', 'Valor Compra', 'Clas.']], body: itemsData, theme: 'plain', styles: { fontSize: 7, cellPadding: 1 }, headStyles: { fillColor: [220, 220, 220], textColor: 50, fontStyle: 'bold' }, columnStyles: { 1: { cellWidth: 70 }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'center' } }, margin: { left: margins.left, right: margins.right } }); currentY = doc.lastAutoTable.finalY + 15;
-
-            // --- SECCIÓN IV: COSTOS INDIRECTOS ---
+            // --- SECCIÓN: COSTOS INDIRECTOS (ANTIGUO IV) ---
             if (currentY > pageHeight - 60) { doc.addPage(); drawHeader(doc); currentY = margins.top; }
             doc.setFillColor(240, 240, 245); doc.rect(margins.left, currentY - 5, pageWidth - 30, 8, 'F');
             doc.setTextColor(49, 39, 130); doc.setFont("helvetica", "bold"); doc.setFontSize(11);
-            doc.text("IV. ESTRUCTURA DE COSTOS INDIRECTOS", margins.left + 2, currentY); currentY += 5;
+            doc.text("ESTRUCTURA DE COSTOS INDIRECTOS", margins.left + 2, currentY); currentY += 5;
             const costBody = window.costStructure.map(c => [c.name, c.percent + " %"]); const totalInd = window.costStructure.reduce((a,b) => a + b.percent, 0).toFixed(2); costBody.push(['TOTAL RECUPERACIÓN INDIRECTA', totalInd + " %"]);
             doc.autoTable({ startY: currentY, head: [['Rubro de Costo', 'Porcentaje Asignado']], body: costBody, theme: 'grid', tableWidth: 100, headStyles: { fillColor: [49, 39, 130], textColor: 255 }, didParseCell: function(data) { if (data.row.index === costBody.length - 1) data.cell.styles.fontStyle = 'bold'; }, margin: { left: margins.left } }); currentY = doc.lastAutoTable.finalY + 15;
 
-            // --- SECCIÓN V: CARACTERIZACIÓN (RESULTADOS) ---
+            // --- SECCIÓN: CARACTERIZACIÓN (ANTIGUO V) ---
             doc.addPage(); drawHeader(doc); currentY = margins.top;
             doc.setFillColor(240, 240, 245); doc.rect(margins.left, currentY - 5, pageWidth - 30, 8, 'F');
             doc.setTextColor(49, 39, 130); doc.setFont("helvetica", "bold"); doc.setFontSize(11);
-            doc.text("V. CARACTERIZACIÓN Y PROYECCIÓN 2026", margins.left + 2, currentY); currentY += 5;
+            doc.text("CARACTERIZACIÓN Y PROYECCIÓN 2026", margins.left + 2, currentY); currentY += 5;
+            
+            // Lógica para obtener el libro seleccionado
+            let selectedSheet = document.getElementById('inventory-book-select').value; 
+            if(!selectedSheet && window.productGroups.length > 0) selectedSheet = window.productGroups[0].name;
+
             let charData = []; if (window.currentExportData && window.currentExportData.length > 0) { doc.setFontSize(8); doc.setTextColor(100); doc.text(`Base de cálculo: ${selectedSheet} | Incremento aplicado: ${document.getElementById('increment-percent').value}% | Muestra parcial.`, margins.left, currentY + 4); currentY += 6; charData = window.currentExportData.slice(0, 150).map(row => [ getColumnVal(row, ['código', 'codigo']), String(getColumnVal(row, ['descripción', 'descripcion'])).substring(0, 30), formatMoney(row._costoTotal), formatMoney(row._tarifaVenta2026), row._variacionRelativa.toFixed(1) + '%', row._category ]); } else { charData = [['-', 'Debe visualizar la sección V en la app primero', '-', '-', '-', '-']]; }
             doc.autoTable({ startY: currentY, head: [['Cód', 'Descripción', 'Costo Tot', 'Tarifa 2026', 'Var %', 'Categoría']], body: charData, theme: 'striped', styles: { fontSize: 7 }, headStyles: { fillColor: [0, 128, 65] }, columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } }, margin: { left: margins.left, right: margins.right } }); currentY = doc.lastAutoTable.finalY + 15;
 
-            // --- NUEVO: RESUMEN GERENCIAL (SECCIÓN VII) ---
-            // Este resumen se coloca ANTES de las firmas, como solicitado.
+            // --- SECCIÓN: RESUMEN GERENCIAL CONSOLIDADO ---
             if (currentY > pageHeight - 100) { doc.addPage(); drawHeader(doc); currentY = margins.top; }
 
             doc.setFillColor(240, 240, 245);
@@ -1146,7 +1167,6 @@
                     ];
                 });
 
-                // Calcular Totales Generales
                 const grandTotalCost = finalizedKeys.reduce((s, k) => s + window.finalizedAnalysis[k].totalCost, 0);
                 const grandTotalRev = finalizedKeys.reduce((s, k) => s + window.finalizedAnalysis[k].totalRevenue26, 0);
                 summaryRows.push([
@@ -1186,7 +1206,7 @@
                 currentY += 20;
             }
 
-            // --- SECCIÓN CONCLUSIONES ---
+            // --- SECCIÓN: CONCLUSIONES ---
             if (currentY > pageHeight - 80) { doc.addPage(); drawHeader(doc); currentY = margins.top; }
             doc.setFillColor(240, 240, 245); doc.rect(margins.left, currentY - 5, pageWidth - 30, 8, 'F');
             doc.setTextColor(49, 39, 130); doc.setFont("helvetica", "bold"); doc.setFontSize(11);
@@ -1195,11 +1215,11 @@
             const conclusions = [ `1. SOSTENIBILIDAD FINANCIERA: La estructura de costos definida incorpora un margen de recuperación indirecta del ${totalInd}%, distribuido en mano de obra, logística y administración.`, "", `2. EFICIENCIA PARETO Y FLUJO DE CAJA: El análisis evidencia que la gestión de inventarios debe focalizarse estrictamente en los productos Tipo A.`, "", `3. IMPACTO TARIFARIO Y REGULACIÓN: La caracterización de bienes permite discriminar entre productos regulados y de mercado libre.` ];
             doc.text(conclusions, margins.left, currentY, { maxWidth: pageWidth - 30, align: "justify" }); currentY += 50;
 
-            // --- SECCIÓN VI: FIRMAS (AL FINAL DEL PDF COMO SOLICITADO) ---
+            // --- SECCIÓN: FIRMAS (ANTIGUO VI) ---
             if (currentY > pageHeight - 40) { doc.addPage(); drawHeader(doc); currentY = margins.top; }
             doc.setFillColor(240, 240, 245); doc.rect(margins.left, currentY - 5, pageWidth - 30, 8, 'F');
             doc.setTextColor(49, 39, 130); doc.setFont("helvetica", "bold"); doc.setFontSize(11);
-            doc.text("VI. VALIDACIÓN Y FIRMAS", margins.left + 2, currentY); currentY += 15;
+            doc.text("VALIDACIÓN Y FIRMAS", margins.left + 2, currentY); currentY += 15;
             let sigRow = []; window.signatures.forEach((s) => { sigRow.push(s.role + "\n\n\n__________________________\n" + s.name + "\n" + s.cargo); });
             doc.autoTable({ startY: currentY, head: [], body: [sigRow], theme: 'plain', styles: { halign: 'center', valign: 'bottom', fontSize: 9, cellPadding: 2 }, margin: { left: margins.left } });
 
@@ -1222,13 +1242,25 @@
             tbody.innerHTML = ''; thead.innerHTML = '';
             const select = document.getElementById('char-book-select');
             if(select.value !== sheetName && sheetName) select.value = sheetName;
-            let rawData = [];
-            if (sheetName === 'all') { Object.values(window.sheetsData).forEach(arr => { rawData = rawData.concat(arr); }); } else { if (!sheetName || !window.sheetsData[sheetName]) { tbody.innerHTML = '<tr><td colspan="100%" class="px-4 py-8 text-center text-slate-400">Seleccione un libro válido para la caracterización.</td></tr>'; return; } rawData = window.sheetsData[sheetName]; }
-            if (rawData.length === 0) { tbody.innerHTML = '<tr><td colspan="100%" class="px-4 py-8 text-center text-slate-400">No hay datos para visualizar.</td></tr>'; return; }
+            
+            let sheetsToProcess = [];
+            if (sheetName === 'all') { 
+                sheetsToProcess = Object.keys(window.sheetsData);
+            } else { 
+                if (!sheetName || !window.sheetsData[sheetName]) { tbody.innerHTML = '<tr><td colspan="100%" class="px-4 py-8 text-center text-slate-400">Seleccione un libro válido para la caracterización.</td></tr>'; return; } 
+                sheetsToProcess = [sheetName];
+            }
+
+            if (sheetsToProcess.length === 0) { tbody.innerHTML = '<tr><td colspan="100%" class="px-4 py-8 text-center text-slate-400">No hay datos para visualizar.</td></tr>'; return; }
+            
+            // Obtener headers de la primera hoja válida
+            const firstSheetData = window.sheetsData[sheetsToProcess[0]];
+            if (!firstSheetData || firstSheetData.length === 0) return;
+            const originalHeaders = Object.keys(firstSheetData[0]);
+
             const incrementPercent = parseFloat(document.getElementById('increment-percent').value) || 0;
             const totalIndirectPercent = window.costStructure.reduce((sum, item) => sum + item.percent, 0);
-            const firstRow = rawData[0];
-            const originalHeaders = Object.keys(firstRow);
+            
             let headerHTML = '<tr>';
             originalHeaders.forEach(h => { headerHTML += `<th class="px-4 py-3 whitespace-nowrap">${h}</th>`; });
             headerHTML += '<th class="px-4 py-3 text-right bg-blue-50 border-l border-blue-200">Costos Indirectos</th>';
@@ -1240,36 +1272,68 @@
             headerHTML += '<th class="px-4 py-3 text-center font-bold bg-blue-900 text-white">CATEGORIZACIÓN</th>';
             headerHTML += '</tr>';
             thead.innerHTML = headerHTML;
+            
             let categoryCounts = { 'BLACK': 0, 'ELITE': 0, 'PLATINO': 0, 'ORO': 0, 'PLATA': 0, 'CLÁSICOS': 0, 'REGULADOS': 0, 'PRODUCTOS SIN FRECUENCIA DE USO': 0 };
-            let processedData = rawData.map(row => {
-                const desc = getColumnVal(row, ['descripción', 'descripcion']);
-                const valCompra = cleanCurrency(getColumnVal(row, ['valor máximo', 'valor maximo', 'ultimas vigencias'])); 
-                const precio2025 = cleanCurrency(getColumnVal(row, ['precio 2025'])); 
-                const pareto = (getColumnVal(row, ['pareto', 'páreto']) || 'N/A').toUpperCase().trim();
-                const identA = (getColumnVal(row, ['identificación', 'identificacion', 'a+']) || '').toUpperCase();
-                const costosIndirectos = valCompra * (totalIndirectPercent / 100);
-                const costoTotal = valCompra + costosIndirectos;
-                const costo2026 = costoTotal * (1 + (incrementPercent / 100));
-                let category = "SIN FRECUENCIA";
-                let badgeClass = "bg-slate-100 text-slate-500";
-                let tarifaVenta2026 = 0;
-                if (pareto === 'A' && identA === 'SI') { category = "BLACK"; badgeClass = "bg-cat-black"; }
-                else if (pareto === 'A') { category = "ELITE"; badgeClass = "bg-cat-elite"; }
-                else if (pareto === 'B') { category = "ORO"; badgeClass = "bg-cat-oro"; }
-                else if (pareto === 'C') { category = "PLATA"; badgeClass = "bg-cat-plata"; }
-                else if (valCompra === 0) { category = "PRODUCTOS SIN FRECUENCIA DE USO"; badgeClass = "bg-cat-sinfreq"; }
-                else { category = "CLÁSICOS"; badgeClass = "bg-cat-clasicos"; }
-                if (desc && desc.toLowerCase().includes('regulado')) { category = "REGULADOS"; badgeClass = "bg-cat-regulados"; }
-                if (category === "REGULADOS") { tarifaVenta2026 = precio2025; } else { tarifaVenta2026 = precio2025 * (1 + (incrementPercent / 100)); }
-                const variacionAbsoluta = tarifaVenta2026 - precio2025;
-                const variacionRelativa = precio2025 !== 0 ? (variacionAbsoluta / precio2025) * 100 : 0;
-                if (categoryCounts.hasOwnProperty(category)) { categoryCounts[category]++; } else { categoryCounts[category] = 1; }
-                return { ...row, _costosIndirectos: costosIndirectos, _costoTotal: costoTotal, _costo2026: costo2026, _tarifaVenta2026: tarifaVenta2026, _variacionAbsoluta: variacionAbsoluta, _variacionRelativa: variacionRelativa, _category: category, _badgeClass: badgeClass };
+            let processedData = [];
+
+            sheetsToProcess.forEach(sName => {
+                const rows = window.sheetsData[sName];
+                // LÓGICA DE NEGOCIO: Detectar hoja Regulada
+                const isRegulatedSheet = sName.toUpperCase().includes('REGULADOS');
+
+                const sheetProcessed = rows.map(row => {
+                    const desc = getColumnVal(row, ['descripción', 'descripcion']);
+                    const valCompra = cleanCurrency(getColumnVal(row, ['valor máximo', 'valor maximo', 'ultimas vigencias'])); 
+                    const precio2025 = cleanCurrency(getColumnVal(row, ['precio 2025'])); 
+                    // NUEVO: Extraer precio 2026 directamente del archivo si existe
+                    const precio2026 = cleanCurrency(getColumnVal(row, ['precio 2026', 'tarifa 2026', 'valor 2026', 'proyección 2026', 'venta 2026', 'precio regulado', 'valor regulado', 'tope', 'regulado']));
+                    
+                    const pareto = (getColumnVal(row, ['pareto', 'páreto']) || 'N/A').toUpperCase().trim();
+                    const identA = (getColumnVal(row, ['identificación', 'identificacion', 'a+']) || '').toUpperCase();
+                    const costosIndirectos = valCompra * (totalIndirectPercent / 100);
+                    const costoTotal = valCompra + costosIndirectos;
+                    const costo2026 = costoTotal * (1 + (incrementPercent / 100));
+                    
+                    let category = "SIN FRECUENCIA";
+                    let badgeClass = "bg-slate-100 text-slate-500";
+                    let tarifaVenta2026 = 0;
+
+                    if (pareto === 'A' && identA === 'SI') { category = "BLACK"; badgeClass = "bg-cat-black"; }
+                    else if (pareto === 'A') { category = "ELITE"; badgeClass = "bg-cat-elite"; }
+                    else if (pareto === 'B') { category = "ORO"; badgeClass = "bg-cat-oro"; }
+                    else if (pareto === 'C') { category = "PLATA"; badgeClass = "bg-cat-plata"; }
+                    else if (valCompra === 0) { category = "PRODUCTOS SIN FRECUENCIA DE USO"; badgeClass = "bg-cat-sinfreq"; }
+                    else { category = "CLÁSICOS"; badgeClass = "bg-cat-clasicos"; }
+                    
+                    // Si la hoja es Regulada, forzar la categoría
+                    if (isRegulatedSheet || (desc && desc.toLowerCase().includes('regulado'))) { 
+                        category = "REGULADOS"; 
+                        badgeClass = "bg-cat-regulados"; 
+                    }
+
+                    if (category === "REGULADOS") { 
+                         // LÓGICA DE NEGOCIO AJUSTADA SECCIÓN V: 
+                         // Priorizar valor de columna "Precio 2026". Si no existe, usar Precio 2025 (incremento 0).
+                         tarifaVenta2026 = (precio2026 > 0) ? Math.round(precio2026) : Math.round(precio2025);
+                    } else { 
+                        tarifaVenta2026 = Math.round(precio2025 * (1 + (incrementPercent / 100))); 
+                    }
+
+                    const variacionAbsoluta = tarifaVenta2026 - precio2025;
+                    const variacionRelativa = precio2025 !== 0 ? (variacionAbsoluta / precio2025) * 100 : 0;
+                    if (categoryCounts.hasOwnProperty(category)) { categoryCounts[category]++; } else { categoryCounts[category] = 1; }
+                    
+                    return { ...row, _costosIndirectos: costosIndirectos, _costoTotal: costoTotal, _costo2026: costo2026, _tarifaVenta2026: tarifaVenta2026, _variacionAbsoluta: variacionAbsoluta, _variacionRelativa: variacionRelativa, _category: category, _badgeClass: badgeClass };
+                });
+                processedData = processedData.concat(sheetProcessed);
             });
+
             currentExportData = processedData;
             window.renderFilterButtons(categoryCounts, processedData.length);
             window.updateCharacterizationChartsData(categoryCounts);
+            
             if (currentCategoryFilter !== 'ALL') { processedData = processedData.filter(d => d._category === currentCategoryFilter); }
+            
             const displayData = processedData.slice(0, 500);
             const html = displayData.map(d => {
                 let rowHTML = '<tr class="hover:bg-slate-50 transition-colors border-b border-slate-100">';
