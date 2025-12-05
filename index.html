@@ -24,23 +24,76 @@
     <!-- SheetJS (Excel) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-    <!-- Firebase SDKs -->
+    <!-- Firebase SDKs (Configuración Segura) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const firebaseConfig = JSON.parse(__firebase_config);
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-
+        // Verificación de seguridad para evitar que la app se rompa si no hay config
+        const hasFirebaseConfig = typeof __firebase_config !== 'undefined' && __firebase_config;
+        
+        let app, auth, db, appId;
         let user = null;
         let unsubscribeSnapshot = null;
 
+        if (hasFirebaseConfig) {
+            try {
+                const firebaseConfig = JSON.parse(__firebase_config);
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+                appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                
+                initAuth();
+
+                onAuthStateChanged(auth, (currentUser) => {
+                    user = currentUser;
+                    if (user) setupRealtimeListener();
+                });
+            } catch (e) {
+                console.warn("Error inicializando Firebase:", e);
+                document.getElementById('db-status').innerHTML = '<i class="fas fa-wifi-slash"></i> Modo Offline';
+            }
+        } else {
+            console.log("Modo Offline: Configuración de Firebase no detectada.");
+            const statusEl = document.getElementById('db-status');
+            if(statusEl) statusEl.innerHTML = '<i class="fas fa-wifi-slash"></i> Modo Offline';
+        }
+
+        async function initAuth() {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (e) {
+                console.error("Error autenticación:", e);
+            }
+        };
+
+        function setupRealtimeListener() {
+            if (unsubscribeSnapshot) unsubscribeSnapshot();
+            // CORRECCIÓN DE ERROR FIREBASE: Ruta con 6 segmentos (PAR)
+            // artifacts(1)/appId(2)/public(3)/data(4)/tariff_model_dashboard(5)/main_document(6)
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'tariff_model_dashboard', 'main_document');
+            unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    if(data.productGroups && data.productGroups.length > 0) window.productGroups = data.productGroups;
+                    if(data.costStructure) window.costStructure = data.costStructure;
+                    if(data.signatures) window.signatures = data.signatures;
+                    if(data.finalizedAnalysis) window.finalizedAnalysis = data.finalizedAnalysis; // Recuperar análisis
+                    
+                    if (!window.isProcessingFile && typeof window.refreshUI === 'function') window.refreshUI(); 
+                }
+            });
+        };
+
+        // Función global para guardar (expuesta al window)
         window.saveDataToFirebase = async () => {
-            if (!user) return;
+            if (!user || !db) return; 
             const statusIndicator = document.getElementById('db-status');
             if(statusIndicator) statusIndicator.innerHTML = '<i class="fas fa-sync fa-spin text-yellow-400"></i> Guardando...';
 
@@ -49,11 +102,13 @@
                     productGroups: window.productGroups,
                     costStructure: window.costStructure,
                     signatures: window.signatures,
+                    finalizedAnalysis: window.finalizedAnalysis, // Guardar análisis
                     lastUpdated: new Date().toISOString(),
                     updatedBy: user.uid
                 };
 
-                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'tariff_model_dashboard');
+                // CORRECCIÓN DE ERROR FIREBASE: Ruta con 6 segmentos
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'tariff_model_dashboard', 'main_document');
                 await setDoc(docRef, aggregatedData, { merge: true });
 
                 if(statusIndicator) statusIndicator.innerHTML = '<i class="fas fa-check-circle text-green-400"></i> Sincronizado';
@@ -64,35 +119,6 @@
                 if(statusIndicator) statusIndicator.innerHTML = '<i class="fas fa-exclamation-triangle text-red-400"></i> Error al guardar';
             }
         };
-
-        const initAuth = async () => {
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                await signInWithCustomToken(auth, __initial_auth_token);
-            } else {
-                await signInAnonymously(auth);
-            }
-        };
-
-        onAuthStateChanged(auth, (currentUser) => {
-            user = currentUser;
-            if (user) setupRealtimeListener();
-        });
-
-        const setupRealtimeListener = () => {
-            if (unsubscribeSnapshot) unsubscribeSnapshot();
-            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'tariff_model_dashboard');
-            unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    if(data.productGroups && data.productGroups.length > 0) window.productGroups = data.productGroups;
-                    if(data.costStructure) window.costStructure = data.costStructure;
-                    if(data.signatures) window.signatures = data.signatures;
-                    if (!window.isProcessingFile) window.refreshUI(); 
-                }
-            });
-        };
-
-        initAuth();
     </script>
 
     <style>
@@ -105,7 +131,6 @@
         .text-secundario { color: #008041; }
         .text-terciario { color: #EC268F; }
         
-        /* Colores Categorías */
         .bg-cat-black { background-color: #000000; color: white; border: 1px solid #333; }
         .bg-cat-elite { background-color: #4b0082; color: white; border: 1px solid #370061; }
         .bg-cat-platino { background-color: #e5e4e2; color: #333; border: 1px solid #ccc; }
@@ -145,7 +170,6 @@
         }
         @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* Estilos Tabla Scrollable */
         .inventory-table-container {
             max-height: 500px;
             overflow-y: auto;
@@ -171,9 +195,22 @@
             height: 100%;
         }
         
-        /* Cursor pointer for charts to indicate interactivity */
-        canvas {
-            cursor: pointer;
+        canvas { cursor: pointer; }
+
+        .section-separator {
+            border-top: 2px dashed #cbd5e1;
+            margin: 2rem 0;
+            position: relative;
+        }
+        .section-separator::after {
+            content: '▼';
+            position: absolute;
+            top: -14px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #f3f4f6;
+            padding: 0 10px;
+            color: #94a3b8;
         }
     </style>
 </head>
@@ -189,7 +226,7 @@
                  <div class="logo-upload-area group" onclick="document.getElementById('Logo_HUHMP_Blanco_Input').click()" title="Clic para cargar el archivo local">
                     <img id="Logo_HUHMP_Blanco_Preview" src="" alt="Logo Blanco" class="h-12 w-auto object-contain drop-shadow-md mb-1">
                     <span class="text-[0.65rem] text-yellow-400 font-bold text-center block leading-tight mt-1"><i class="fas fa-upload mr-1"></i>Cargar archivo:<br>Logo_HUHMP_Blanco</span>
-                    <input type="file" id="Logo_HUHMP_Blanco_Input" accept="image/png, image/jpeg, image/svg+xml" class="hidden" onchange="updateSpecificLogo(this)">
+                    <input type="file" id="Logo_HUHMP_Blanco_Input" accept="image/png, image/jpeg, image/svg+xml" class="hidden" onchange="window.updateSpecificLogo(this)">
                 </div>
 
                 <div class="flex-grow border-l border-blue-800 pl-4 ml-2">
@@ -197,16 +234,16 @@
                     <p class="text-blue-200 text-sm md:text-base">ESE Hospital Universitario Hernando Moncaleano Perdomo</p>
                     <div class="flex items-center justify-between mt-1">
                         <span class="text-xs bg-blue-800 px-2 py-0.5 rounded text-blue-100 border border-blue-700 font-mono">GD-SGI-M-005 | Vigencia 2026</span>
-                        <div id="db-status" class="text-[0.7rem] bg-black/20 px-2 rounded-full ml-4 inline-block"><i class="fas fa-circle-notch fa-spin"></i> Conectando...</div>
+                        <div id="db-status" class="text-[0.7rem] bg-black/20 px-2 rounded-full ml-4 inline-block"><i class="fas fa-circle-notch fa-spin"></i> Inicializando...</div>
                     </div>
                 </div>
             </div>
 
             <div class="flex flex-col gap-2 z-10 flex-shrink-0">
-                <button onclick="resetApp()" class="bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded-lg shadow-md transition-colors flex items-center justify-center font-semibold text-xs ring-1 ring-slate-500 w-full" title="Borrar datos y reiniciar">
+                <button onclick="window.resetApp()" class="bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded-lg shadow-md transition-colors flex items-center justify-center font-semibold text-xs ring-1 ring-slate-500 w-full" title="Borrar datos y reiniciar">
                     <i class="fas fa-undo mr-2"></i> Restablecer
                 </button>
-                 <button onclick="generateFullReport()" class="bg-secundario hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow-md transition-colors flex items-center justify-center font-semibold text-xs ring-1 ring-green-600 w-full">
+                 <button onclick="window.generateFullReport()" class="bg-secundario hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow-md transition-colors flex items-center justify-center font-semibold text-xs ring-1 ring-green-600 w-full">
                     <i class="fas fa-file-pdf mr-2"></i> Informe Completo
                 </button>
             </div>
@@ -230,7 +267,7 @@
                             <p class="text-sm font-bold text-slate-700">Cargar Archivo Maestro</p>
                             <p class="text-xs text-slate-500" id="upload-status-text">Excel Multilibro (.xlsx, .xlsm)</p>
                         </div>
-                        <input type="file" id="pharmacy-file-upload" accept=".csv, .xlsx, .xls, .xlsm" class="hidden" onchange="handlePharmacyFileUpload(event)">
+                        <input type="file" id="pharmacy-file-upload" accept=".csv, .xlsx, .xls, .xlsm" class="hidden" onchange="window.handlePharmacyFileUpload(event)">
                     </div>
                 </div>
 
@@ -271,7 +308,7 @@
                     </div>
                     <div class="flex items-center gap-2 bg-slate-100 p-2 rounded-lg">
                         <label for="pareto-book-select" class="text-xs font-bold text-slate-600 uppercase"><i class="fas fa-filter mr-1"></i>Fuente:</label>
-                        <select id="pareto-book-select" onchange="updateParetoBySheet(this.value)" class="text-sm border-none bg-transparent focus:ring-0 text-principal font-bold cursor-pointer outline-none">
+                        <select id="pareto-book-select" onchange="window.updateParetoBySheet(this.value)" class="text-sm border-none bg-transparent focus:ring-0 text-principal font-bold cursor-pointer outline-none">
                             <option value="all">Consolidado General</option>
                         </select>
                     </div>
@@ -320,18 +357,18 @@
                              <i class="fas fa-search text-slate-400 pl-2"></i>
                              <input id="inventory-search-input" type="text" placeholder="Buscar por nombre o código..." 
                                     class="text-xs border-none focus:ring-0 text-slate-700 w-48 outline-none"
-                                    onkeyup="if(event.key === 'Enter') searchInventory()">
-                             <button onclick="searchInventory()" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-1 rounded text-xs font-bold transition">
+                                    onkeyup="if(event.key === 'Enter') window.searchInventory()">
+                             <button onclick="window.searchInventory()" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-1 rounded text-xs font-bold transition">
                                 Buscar
                              </button>
-                             <button onclick="clearInventorySearch()" class="text-slate-400 hover:text-red-500 px-1 ml-1" title="Limpiar filtro">
+                             <button onclick="window.clearInventorySearch()" class="text-slate-400 hover:text-red-500 px-1 ml-1" title="Limpiar filtro">
                                 <i class="fas fa-times"></i>
                              </button>
                         </div>
 
                         <div class="flex items-center gap-2 bg-slate-100 p-2 rounded-lg border border-slate-200">
                             <label for="inventory-book-select" class="text-xs font-bold text-slate-600 uppercase"><i class="fas fa-book mr-1"></i>Libro:</label>
-                            <select id="inventory-book-select" onchange="renderInventoryTable(this.value)" class="text-sm border-none bg-transparent focus:ring-0 text-principal font-bold cursor-pointer outline-none">
+                            <select id="inventory-book-select" onchange="window.renderInventoryTable(this.value)" class="text-sm border-none bg-transparent focus:ring-0 text-principal font-bold cursor-pointer outline-none">
                                 <option value="">Seleccione...</option>
                             </select>
                         </div>
@@ -366,14 +403,11 @@
                 </div>
             </section>
 
-            <!-- SECCIÓN: GRÁFICA DINÁMICA (REMOVIDA DE ESTA VERSIÓN) -->
-            <!-- SECCIÓN IV: Costos Indirectos (MODIFICADA: SIN DÓLARES NI SIMULACIÓN) -->
+            <!-- SECCIÓN IV: Costos Indirectos -->
             <section id="section-costos" class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                 <div class="flex flex-col lg:flex-row justify-between items-center mb-4 border-b pb-2 gap-4">
                     <h2 class="text-xl font-bold text-slate-700">IV. Estructura de Costos Indirectos</h2>
                 </div>
-
-                <!-- Se eliminó el div #cost-item-result de simulación -->
 
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm text-left">
@@ -394,7 +428,7 @@
                 </div>
             </section>
 
-            <!-- SECCIÓN V: Caracterización de Bienes (DINÁMICA + FILTROS) -->
+            <!-- SECCIÓN V: Caracterización de Bienes -->
             <section id="section-caracterizacion" class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                 <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 border-b pb-4 gap-4">
                     <div>
@@ -406,30 +440,28 @@
                         <div class="flex gap-2">
                              <div class="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200 w-full sm:w-auto">
                                 <label for="increment-percent" class="text-xs font-bold text-slate-600 uppercase">Incremento 2026 (%):</label>
-                                <input type="number" id="increment-percent" value="10" class="table-input w-16 text-right font-bold text-principal" onchange="renderCharacterizationTable(document.getElementById('char-book-select').value)">
+                                <input type="number" id="increment-percent" value="10" class="table-input w-16 text-right font-bold text-principal" onchange="window.renderCharacterizationTable(document.getElementById('char-book-select').value)">
                             </div>
     
                             <div class="flex items-center gap-2 bg-slate-100 p-2 rounded-lg border border-slate-200 w-full sm:w-auto">
                                 <label for="char-book-select" class="text-xs font-bold text-slate-600 uppercase"><i class="fas fa-book mr-1"></i>Libro:</label>
-                                <select id="char-book-select" onchange="renderCharacterizationTable(this.value)" class="text-sm border-none bg-transparent focus:ring-0 text-principal font-bold cursor-pointer outline-none">
+                                <select id="char-book-select" onchange="window.renderCharacterizationTable(this.value)" class="text-sm border-none bg-transparent focus:ring-0 text-principal font-bold cursor-pointer outline-none">
                                     <option value="">Seleccione...</option>
                                 </select>
                             </div>
                         </div>
                         
                         <!-- BOTÓN DESCARGA EXCEL -->
-                        <button onclick="downloadCharacterizationExcel()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow-sm text-xs font-bold flex items-center gap-2 transition-colors">
-                            <i class="fas fa-file-excel"></i> Descargar Excel Completo (Con Cálculos)
+                        <button onclick="window.downloadCharacterizationExcel()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow-sm text-xs font-bold flex items-center gap-2 transition-colors">
+                            <i class="fas fa-file-excel"></i> Descargar Excel Completo
                         </button>
                     </div>
                 </div>
 
-                <!-- FILTROS DE CATEGORÍA (Botones informativos) -->
-                <div class="flex flex-wrap gap-2 mb-4 justify-center" id="category-filters">
-                    <!-- El contenido de este div se generará dinámicamente en JS -->
-                </div>
+                <!-- FILTROS DE CATEGORÍA -->
+                <div class="flex flex-wrap gap-2 mb-4 justify-center" id="category-filters"></div>
 
-                <!-- GRÁFICAS DE CARACTERIZACIÓN (DOS COLUMNAS) -->
+                <!-- GRÁFICAS DE CARACTERIZACIÓN -->
                 <div class="border-b pb-6 mb-6">
                     <h3 class="text-sm font-bold text-slate-700 mb-4 text-center">Distribución Estratégica del Portafolio (Interactiva)</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -459,11 +491,11 @@
                     </table>
                 </div>
                 
-                <!-- Explicación de Categorías (Texto Actualizado) -->
+                <!-- Explicación de Categorías -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs mt-4">
                      <div class="info-card border-l-black">
                         <h4 class="font-bold text-black mb-1">BLACK (A + Estratégico)</h4>
-                        <p class="text-slate-600">Máxima prioridad. Productos Pareto A con Identificación estratégica (A+). Requieren gestión intensiva.</p>
+                        <p class="text-slate-600">Máxima prioridad. Productos Pareto A con Identificación estratégica (A+).</p>
                     </div>
                     <div class="info-card border-l-indigo-800">
                         <h4 class="font-bold text-indigo-900 mb-1">ELITE (A)</h4>
@@ -475,7 +507,7 @@
                     </div>
                     <div class="info-card border-l-gray-400">
                         <h4 class="font-bold text-gray-700 mb-1">PLATA (C)</h4>
-                        <p class="text-slate-600">Productos Pareto C. Bajo impacto financiero pero alto volumen de referencias.</p>
+                        <p class="text-slate-600">Productos Pareto C. Bajo impacto financiero.</p>
                     </div>
                     <div class="info-card border-l-blue-500">
                         <h4 class="font-bold text-blue-700 mb-1">CLÁSICOS</h4>
@@ -483,16 +515,16 @@
                     </div>
                     <div class="info-card border-l-green-500">
                         <h4 class="font-bold text-green-700 mb-1">REGULADOS</h4>
-                        <p class="text-slate-600">Productos con precios controlados por la CNPMDM. Su tarifa de venta 2026 no tiene incremento.</p>
+                        <p class="text-slate-600">Productos con precios controlados por la CNPMDM. Tarifa fija.</p>
                     </div>
                 </div>
             </section>
 
-            <!-- SECCIÓN VI: Firmas (ANTES V) -->
+             <!-- SECCIÓN VI: Firmas -->
             <section id="section-firmas" class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                 <div class="flex justify-between items-center mb-4 border-b pb-2">
                     <h2 class="text-xl font-bold text-slate-700">VI. Firmas</h2>
-                    <button onclick="addSignature()" class="text-xs bg-principal text-white px-3 py-1 rounded hover:bg-blue-800"><i class="fas fa-plus"></i></button>
+                    <button onclick="window.addSignature()" class="text-xs bg-principal text-white px-3 py-1 rounded hover:bg-blue-800"><i class="fas fa-plus"></i></button>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm text-left">
@@ -500,6 +532,24 @@
                     </table>
                 </div>
             </section>
+            
+            <div class="section-separator"></div>
+
+            <!-- SECCIÓN VII: Análisis de Tarifas por Libro (NUEVA) -->
+            <section id="section-analisis-tarifas" class="bg-slate-50 p-6 rounded-xl shadow-inner border border-slate-300">
+                <div class="mb-6">
+                    <h2 class="text-xl font-bold text-slate-800 mb-2">VII. Análisis de Tarifas por Libro (Detallado)</h2>
+                    <p class="text-sm text-slate-600">Defina el incremento individual y guarde la configuración para el informe final consolidado.</p>
+                </div>
+                
+                <div id="rate-analysis-container" class="space-y-8">
+                    <div class="text-center py-10 text-slate-400">
+                        <i class="fas fa-layer-group text-3xl mb-2"></i>
+                        <p>Cargue un archivo para visualizar las tablas de análisis individual.</p>
+                    </div>
+                </div>
+            </section>
+
         </main>
         
         <!-- FOOTER -->
@@ -514,17 +564,18 @@
         window.isProcessingFile = false;
         window.sheetsData = {};
         window.productGroups = [];
-        window.currentBaseCost = 0; // Ya no se usa base cost monetario para simulación
+        window.currentBaseCost = 0; 
+        window.finalizedAnalysis = {}; 
+
         let Logo_HUHMP_Blanco = ""; 
         let currentPieMode = 'count';
-        // dynamicAnalysisChart eliminado
-        let characterizationChart = null; // Chart Dona
-        let characterizationBarChart = null; // Chart Barras
+        let characterizationChart = null; 
+        let characterizationBarChart = null; 
         let currentCategoryFilter = 'ALL';
         let currentParetoFilter = 'ALL';
-        // Variable global para almacenar datos procesados para exportación
         let currentExportData = []; 
-        let consecutiveCounter = 1000; // Counter for PDF consecutive
+        let consecutiveCounter = 1000; 
+        let paretoChart, pieChart;
 
         // Configuraciones Iniciales
         window.costStructure = [
@@ -541,21 +592,21 @@
         ];
 
         window.onload = () => {
-            initLogo();
-            renderCostStructure();
-            renderSignatures();
-            initCharts();
-            // initDynamicChart(); // ELIMINADO
-            initCharacterizationCharts(); // Inicializar ambos charts de sección V
+            window.initLogo();
+            window.renderCostStructure();
+            window.renderSignatures();
+            window.initCharts();
+            window.initCharacterizationCharts(); 
             window.refreshUI();
         };
 
         window.refreshUI = function() {
-            renderSummaryButtons();
-            populateSelectors();
-            updateParetoBySheet('all');
-            renderCostStructure();
-            renderSignatures();
+            window.renderSummaryButtons();
+            window.populateSelectors();
+            window.updateParetoBySheet('all');
+            window.renderCostStructure();
+            window.renderSignatures();
+            window.renderRateAnalysisSection(); 
         }
 
         window.resetApp = function() {
@@ -564,20 +615,20 @@
             window.sheetsData = {};
             window.productGroups = [];
             window.currentBaseCost = 0;
+            window.finalizedAnalysis = {}; 
             currentCategoryFilter = 'ALL';
             currentParetoFilter = 'ALL';
             
             document.getElementById('pharmacy-file-upload').value = "";
-             document.getElementById('Logo_HUHMP_Blanco_Input').value = "";
-            initLogo();
+            document.getElementById('Logo_HUHMP_Blanco_Input').value = "";
+            window.initLogo();
             
             if(paretoChart) { paretoChart.data.labels = []; paretoChart.data.datasets[0].data = []; paretoChart.update(); }
             if(pieChart) { pieChart.data.labels = []; pieChart.data.datasets[0].data = []; pieChart.update(); }
             
-            // Reset nuevos charts
             if(characterizationChart) { characterizationChart.data.labels=[]; characterizationChart.data.datasets[0].data=[]; characterizationChart.update(); }
             if(characterizationBarChart) { characterizationBarChart.data.labels=[]; characterizationBarChart.data.datasets[0].data=[]; characterizationBarChart.update(); }
-            document.getElementById('category-filters').innerHTML = ''; // Limpiar botones
+            document.getElementById('category-filters').innerHTML = ''; 
 
             document.getElementById('book-detail-panel').classList.add('hidden');
             document.getElementById('inventory-search-input').value = "";
@@ -587,7 +638,185 @@
             window.refreshUI();
         }
 
-        function initCharacterizationCharts() {
+        // --- FUNCIONES SECCIÓN VII (NUEVAS) ---
+        window.renderRateAnalysisSection = function() {
+            const container = document.getElementById('rate-analysis-container');
+            if (!window.sheetsData || Object.keys(window.sheetsData).length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-10 text-slate-400">
+                        <i class="fas fa-layer-group text-3xl mb-2"></i>
+                        <p>Cargue un archivo para visualizar las tablas de análisis individual.</p>
+                    </div>`;
+                return;
+            }
+
+            container.innerHTML = '';
+            
+            // Iterar por cada libro cargado
+            Object.keys(window.sheetsData).forEach((sheetName) => {
+                // Generar ID seguro
+                const safeId = sheetName.replace(/[^a-zA-Z0-9]/g, '_');
+                
+                const html = `
+                    <div class="bg-white p-4 rounded-lg shadow border border-slate-200" id="analysis-block-${safeId}">
+                        <div class="flex flex-col sm:flex-row justify-between items-center mb-4 border-b pb-2 gap-4">
+                            <h3 class="font-bold text-principal text-lg"><i class="fas fa-book mr-2"></i>${sheetName}</h3>
+                            
+                            <div class="flex items-center gap-4 bg-slate-50 p-2 rounded-lg">
+                                <div class="flex items-center gap-2">
+                                    <label class="text-xs font-bold text-slate-600 uppercase">Incremento 2026 (%):</label>
+                                    <input type="number" id="increment-${safeId}" value="10" 
+                                           class="table-input w-20 text-right font-bold text-principal border-blue-300 focus:border-blue-500"
+                                           onchange="window.updateSheetTable('${sheetName.replace(/'/g, "\\'")}', '${safeId}')">
+                                </div>
+                                <button onclick="window.saveSheetAnalysis('${sheetName.replace(/'/g, "\\'")}', '${safeId}')" 
+                                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow text-xs font-bold flex items-center gap-2 transition-transform active:scale-95">
+                                    <i class="fas fa-save"></i> Guardar Configuración
+                                </button>
+                                <span id="status-${safeId}" class="text-xs font-bold text-slate-400 italic">Sin guardar</span>
+                            </div>
+                        </div>
+
+                        <div class="inventory-table-container max-h-[300px]">
+                            <table class="w-full text-xs text-left inventory-table">
+                                <thead class="text-xs uppercase bg-slate-700 text-white sticky top-0">
+                                    <tr>
+                                        <th class="px-4 py-2">Cód</th>
+                                        <th class="px-4 py-2">Descripción</th>
+                                        <th class="px-4 py-2 text-right">Costo Total</th>
+                                        <th class="px-4 py-2 text-right">Tarifa 2026</th>
+                                        <th class="px-4 py-2 text-right">Var %</th>
+                                        <th class="px-4 py-2 text-center">Categoría</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody-${safeId}" class="divide-y divide-slate-100">
+                                    <!-- Rows populated by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+                container.innerHTML += html;
+                
+                setTimeout(() => window.updateSheetTable(sheetName, safeId), 0);
+            });
+        }
+
+        window.updateSheetTable = function(sheetName, safeId) {
+            const rawData = window.sheetsData[sheetName];
+            const tbody = document.getElementById(`tbody-${safeId}`);
+            const inputInc = document.getElementById(`increment-${safeId}`);
+            if(!inputInc) return;
+            const increment = parseFloat(inputInc.value) || 0;
+            const totalIndirect = window.costStructure.reduce((s, i) => s + i.percent, 0);
+
+            if (!rawData) return;
+
+            // Procesar datos (similar a Sección V pero local)
+            const processed = rawData.map(row => {
+                const desc = getColumnVal(row, ['descripción', 'descripcion']);
+                const valCompra = cleanCurrency(getColumnVal(row, ['valor máximo', 'valor maximo', 'ultimas vigencias'])); 
+                const precio2025 = cleanCurrency(getColumnVal(row, ['precio 2025'])); 
+                
+                const pareto = (getColumnVal(row, ['pareto', 'páreto']) || 'N/A').toUpperCase().trim();
+                const identA = (getColumnVal(row, ['identificación', 'identificacion', 'a+']) || '').toUpperCase();
+
+                const costosIndirectos = valCompra * (totalIndirect / 100);
+                const costoTotal = valCompra + costosIndirectos;
+                
+                let category = "SIN FRECUENCIA";
+                let badgeClass = "bg-slate-100 text-slate-500";
+                
+                if (pareto === 'A' && identA === 'SI') { category = "BLACK"; badgeClass = "bg-cat-black"; }
+                else if (pareto === 'A') { category = "ELITE"; badgeClass = "bg-cat-elite"; }
+                else if (pareto === 'B') { category = "ORO"; badgeClass = "bg-cat-oro"; }
+                else if (pareto === 'C') { category = "PLATA"; badgeClass = "bg-cat-plata"; }
+                else if (valCompra === 0) { category = "PRODUCTOS SIN FRECUENCIA DE USO"; badgeClass = "bg-cat-sinfreq"; }
+                else { category = "CLÁSICOS"; badgeClass = "bg-cat-clasicos"; }
+                if (desc && desc.toLowerCase().includes('regulado')) { category = "REGULADOS"; badgeClass = "bg-cat-regulados"; }
+
+                let tarifa26 = 0;
+                if (category === "REGULADOS") tarifa26 = precio2025;
+                else tarifa26 = precio2025 * (1 + (increment / 100));
+
+                const varAbs = tarifa26 - precio2025;
+                const varRel = precio2025 !== 0 ? (varAbs / precio2025) * 100 : 0;
+
+                return {
+                    codigo: getColumnVal(row, ['código', 'codigo']),
+                    desc: desc,
+                    costoTotal,
+                    tarifa26,
+                    varRel,
+                    category,
+                    badgeClass
+                };
+            });
+
+            tbody.innerHTML = processed.slice(0, 100).map(r => `
+                <tr class="hover:bg-slate-50">
+                    <td class="px-4 py-2 font-mono text-slate-600">${r.codigo || '-'}</td>
+                    <td class="px-4 py-2 truncate max-w-xs" title="${r.desc}">${String(r.desc).substring(0,40)}</td>
+                    <td class="px-4 py-2 text-right">${formatMoney(r.costoTotal)}</td>
+                    <td class="px-4 py-2 text-right font-bold text-blue-800">${formatMoney(r.tarifa26)}</td>
+                    <td class="px-4 py-2 text-right text-green-600 text-[10px]">${r.varRel.toFixed(1)}%</td>
+                    <td class="px-4 py-2 text-center"><span class="px-2 py-0.5 rounded text-[10px] ${r.badgeClass}">${r.category}</span></td>
+                </tr>
+            `).join('');
+
+            const statusEl = document.getElementById(`status-${safeId}`);
+            if(statusEl && statusEl.classList.contains('text-green-500')) {
+                statusEl.innerText = "Modificado (Guardar de nuevo)";
+                statusEl.className = "text-xs font-bold text-yellow-500 italic";
+            }
+        }
+
+        window.saveSheetAnalysis = function(sheetName, safeId) {
+            const inputInc = document.getElementById(`increment-${safeId}`);
+            if(!inputInc) return;
+            const increment = parseFloat(inputInc.value) || 0;
+            const totalIndirect = window.costStructure.reduce((s, i) => s + i.percent, 0);
+            const rawData = window.sheetsData[sheetName];
+            
+            let totalCost = 0;
+            let totalRevenue26 = 0;
+            let items = rawData.length;
+
+            rawData.forEach(row => {
+                const valCompra = cleanCurrency(getColumnVal(row, ['valor máximo', 'valor maximo', 'ultimas vigencias'])); 
+                const precio2025 = cleanCurrency(getColumnVal(row, ['precio 2025'])); 
+                const desc = getColumnVal(row, ['descripción', 'descripcion']);
+
+                const costosIndirectos = valCompra * (totalIndirect / 100);
+                const costoTotal = valCompra + costosIndirectos;
+                
+                let isRegulated = desc && desc.toLowerCase().includes('regulado');
+                
+                let tarifa26 = 0;
+                if (isRegulated) tarifa26 = precio2025;
+                else tarifa26 = precio2025 * (1 + (increment / 100));
+
+                totalCost += costoTotal;
+                totalRevenue26 += tarifa26;
+            });
+
+            window.finalizedAnalysis[sheetName] = {
+                increment,
+                items,
+                totalCost,
+                totalRevenue26,
+                margin: totalRevenue26 - totalCost
+            };
+
+            const statusEl = document.getElementById(`status-${safeId}`);
+            statusEl.innerHTML = '<i class="fas fa-check"></i> Guardado';
+            statusEl.className = "text-xs font-bold text-green-500 italic";
+            
+            if(window.saveDataToFirebase) window.saveDataToFirebase();
+        }
+
+        // --- FUNCIONES EXISTENTES ---
+        window.initCharacterizationCharts = function() {
             const commonOptions = {
                 responsive: true,
                 maintainAspectRatio: false,
@@ -595,52 +824,29 @@
                     if (elements && elements.length > 0) {
                         const index = elements[0].index;
                         const label = chart.data.labels[index];
-                        // Mapeo inverso si es necesario o uso directo del label
-                        // Filtrar tabla
-                        applyCategoryFilter(label, null); 
+                        window.applyCategoryFilter(label, null); 
                     }
                 }
             };
-
-            // Dona (Izquierda)
             const ctxDona = document.getElementById('characterizationChart').getContext('2d');
-            characterizationChart = new Chart(ctxDona, {
-                type: 'doughnut',
-                data: { labels: [], datasets: [{ data: [], backgroundColor: [] }] },
-                options: {
-                    ...commonOptions,
-                    plugins: { legend: { position: 'right' } }
-                }
-            });
-
-            // Barras (Derecha)
+            characterizationChart = new Chart(ctxDona, { type: 'doughnut', data: { labels: [], datasets: [{ data: [], backgroundColor: [] }] }, options: { ...commonOptions, plugins: { legend: { position: 'right' } } } });
             const ctxBarras = document.getElementById('characterizationBarChart').getContext('2d');
-            characterizationBarChart = new Chart(ctxBarras, {
-                type: 'bar',
-                data: { labels: [], datasets: [{ data: [], backgroundColor: [] }] },
-                options: {
-                    ...commonOptions,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { beginAtZero: true, title: { display: true, text: 'N° Ítems' } }
-                    }
-                }
-            });
+            characterizationBarChart = new Chart(ctxBarras, { type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: [] }] }, options: { ...commonOptions, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, title: { display: true, text: 'N° Ítems' } } } } });
         }
 
-        // --- HELPERS ---
-         function initLogo() {
+        window.initLogo = function() {
             const c = document.createElement('canvas'); c.width=200; c.height=200;
             const x = c.getContext('2d'); x.fillStyle='#FFF'; x.beginPath();
             x.moveTo(100,10); x.bezierCurveTo(200,10,200,100,100,190); x.bezierCurveTo(0,100,0,10,100,10); x.fill();
             x.globalCompositeOperation='destination-out'; x.fillRect(80,50,40,100); x.fillRect(50,80,100,40);
             Logo_HUHMP_Blanco = c.toDataURL();
-            document.getElementById('Logo_HUHMP_Blanco_Preview').src = Logo_HUHMP_Blanco;
+            const preview = document.getElementById('Logo_HUHMP_Blanco_Preview');
+            if(preview) preview.src = Logo_HUHMP_Blanco;
         }
-        function updateSpecificLogo(i){ if(i.files[0]){ const r=new FileReader(); r.onload=e=>{Logo_HUHMP_Blanco=e.target.result; document.getElementById('Logo_HUHMP_Blanco_Preview').src=Logo_HUHMP_Blanco;}; r.readAsDataURL(i.files[0]); } }
+        window.updateSpecificLogo = function(i){ if(i.files[0]){ const r=new FileReader(); r.onload=e=>{Logo_HUHMP_Blanco=e.target.result; document.getElementById('Logo_HUHMP_Blanco_Preview').src=Logo_HUHMP_Blanco;}; r.readAsDataURL(i.files[0]); } }
 
 
-        function handlePharmacyFileUpload(event) {
+        window.handlePharmacyFileUpload = function(event) {
             const file = event.target.files[0];
             const status = document.getElementById('upload-status-text');
             if (!file) return;
@@ -654,38 +860,21 @@
                 try {
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, {type: 'array'});
-                    
                     window.sheetsData = {};
                     window.productGroups = [];
-
                     workbook.SheetNames.forEach(sheetName => {
                         const worksheet = workbook.Sheets[sheetName];
                         const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
-                        
                         if (jsonData.length > 0) {
                             window.sheetsData[sheetName] = jsonData;
                             const summary = analyzeSheetSummary(jsonData);
-                            window.productGroups.push({
-                                name: sheetName,
-                                count: jsonData.length,
-                                cost: summary.totalCost,
-                                revenue: summary.totalRevenue,
-                                topPareto: summary.topPareto
-                            });
+                            window.productGroups.push({ name: sheetName, count: jsonData.length, cost: summary.totalCost, revenue: summary.totalRevenue, topPareto: summary.topPareto });
                         }
                     });
-
-                    onSuccessUpload(window.productGroups.length);
+                    window.onSuccessUpload(window.productGroups.length);
                     window.refreshUI();
                     if(window.saveDataToFirebase) window.saveDataToFirebase();
-                    
-                } catch (error) {
-                    console.error(error);
-                    status.innerText = "Error";
-                    status.className = "text-xs text-red-600 font-bold";
-                } finally {
-                    window.isProcessingFile = false;
-                }
+                } catch (error) { console.error(error); status.innerText = "Error"; status.className = "text-xs text-red-600 font-bold"; } finally { window.isProcessingFile = false; }
             };
             reader.readAsArrayBuffer(file);
         }
@@ -698,24 +887,15 @@
             });
             return matchedKey ? row[matchedKey] : '';
         }
-
         function normalizeHeader(h) { return h ? h.toString().toLowerCase().trim().replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ') : ''; }
-
+        
         window.renderInventoryTable = function(sheetName, searchQuery = "", paretoFilter = null) {
             const tbody = document.getElementById('inventory-table-body');
             tbody.innerHTML = '';
-            
             const select = document.getElementById('inventory-book-select');
             if(select.value !== sheetName && sheetName) select.value = sheetName;
-
-            if (!sheetName || !window.sheetsData[sheetName]) {
-                tbody.innerHTML = '<tr><td colspan="11" class="px-4 py-8 text-center text-slate-400">Seleccione un libro válido.</td></tr>';
-                return;
-            }
-
+            if (!sheetName || !window.sheetsData[sheetName]) { tbody.innerHTML = '<tr><td colspan="11" class="px-4 py-8 text-center text-slate-400">Seleccione un libro válido.</td></tr>'; return; }
             let data = window.sheetsData[sheetName];
-            
-            // Filtro por Búsqueda
             if (searchQuery) {
                 const query = searchQuery.toLowerCase().trim();
                 data = data.filter(row => {
@@ -724,22 +904,14 @@
                     return codigo.includes(query) || desc.includes(query);
                 });
             }
-            
-            // Filtro por Pareto (Interacción con Chart de Sección II)
             if (paretoFilter && paretoFilter !== 'ALL') {
                 data = data.filter(row => {
                     const paretoVal = (getColumnVal(row, ['pareto', 'páreto']) || '').toString().toUpperCase().trim();
                     return paretoVal === paretoFilter;
                 });
             }
-
             const displayData = data.slice(0, 500); 
-
-            if (displayData.length === 0) {
-                 tbody.innerHTML = '<tr><td colspan="11" class="px-4 py-8 text-center text-slate-400">No se encontraron ítems que coincidan con los filtros.</td></tr>';
-                 return;
-            }
-
+            if (displayData.length === 0) { tbody.innerHTML = '<tr><td colspan="11" class="px-4 py-8 text-center text-slate-400">No se encontraron ítems que coincidan con los filtros.</td></tr>'; return; }
             const html = displayData.map(row => {
                 const codigo = getColumnVal(row, ['código', 'codigo', 'producto']);
                 const desc = getColumnVal(row, ['descripción', 'descripcion']);
@@ -752,7 +924,6 @@
                 const hom = getColumnVal(row, ['homologación', 'homologacion']);
                 const pareto = getColumnVal(row, ['pareto', 'páreto']);
                 const ident = getColumnVal(row, ['identificación', 'identificacion', 'a+']);
-
                 return `
                     <tr class="hover:bg-slate-50 transition-colors border-b border-slate-100">
                         <td class="px-4 py-2 font-mono text-xs text-slate-600">${codigo || '-'}</td>
@@ -772,337 +943,6 @@
             tbody.innerHTML = html;
         }
 
-        // --- LÓGICA DE CARACTERIZACIÓN (SECCIÓN V) ---
-        window.applyCategoryFilter = function(category, btnElement) {
-            currentCategoryFilter = category;
-            
-            // UI Toggle
-            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active', 'scale-105', 'opacity-100'));
-            // Si viene de un botón (y no del gráfico), resalta el botón
-            if (btnElement) {
-                btnElement.classList.add('active', 'scale-105', 'opacity-100');
-            } else {
-                // Si viene del gráfico, busca el botón correspondiente y actívalo
-                const targetBtn = Array.from(document.querySelectorAll('.filter-btn')).find(b => b.textContent.includes(category));
-                if(targetBtn) targetBtn.classList.add('active', 'scale-105', 'opacity-100');
-            }
-            
-            const currentBook = document.getElementById('char-book-select').value;
-            if(currentBook) renderCharacterizationTable(currentBook);
-        }
-
-        window.renderCharacterizationTable = function(sheetName) {
-            const thead = document.getElementById('char-table-head');
-            const tbody = document.getElementById('char-table-body');
-            tbody.innerHTML = '';
-            thead.innerHTML = '';
-
-            const select = document.getElementById('char-book-select');
-            if(select.value !== sheetName && sheetName) select.value = sheetName;
-
-            let rawData = [];
-            // LÓGICA AGREGADA: Soporte para 'all'
-            if (sheetName === 'all') {
-                Object.values(window.sheetsData).forEach(arr => {
-                    rawData = rawData.concat(arr);
-                });
-            } else {
-                 if (!sheetName || !window.sheetsData[sheetName]) {
-                    tbody.innerHTML = '<tr><td colspan="100%" class="px-4 py-8 text-center text-slate-400">Seleccione un libro válido para la caracterización.</td></tr>';
-                    return;
-                }
-                rawData = window.sheetsData[sheetName];
-            }
-            
-            if (rawData.length === 0) {
-                 tbody.innerHTML = '<tr><td colspan="100%" class="px-4 py-8 text-center text-slate-400">No hay datos para visualizar.</td></tr>';
-                 return;
-            }
-
-            const incrementPercent = parseFloat(document.getElementById('increment-percent').value) || 0;
-            // Aseguramos que se tome la estructura de costos actualizada
-            const totalIndirectPercent = window.costStructure.reduce((sum, item) => sum + item.percent, 0);
-
-            // 1. GENERAR CABECERAS DINÁMICAS (Usamos la fila 0, asumiendo consistencia)
-            const firstRow = rawData[0];
-            const originalHeaders = Object.keys(firstRow);
-            
-            let headerHTML = '<tr>';
-            originalHeaders.forEach(h => {
-                headerHTML += `<th class="px-4 py-3 whitespace-nowrap">${h}</th>`;
-            });
-            // Añadir nuevas columnas calculadas
-            headerHTML += '<th class="px-4 py-3 text-right bg-blue-50 border-l border-blue-200">Costos Indirectos</th>';
-            headerHTML += '<th class="px-4 py-3 text-right bg-blue-50">Costo Total</th>';
-            headerHTML += '<th class="px-4 py-3 text-right bg-blue-50">Costo 2026 (Proy)</th>';
-            headerHTML += '<th class="px-4 py-3 text-right bg-blue-900 text-white font-bold border-l border-blue-700">Tarifa Venta 2026</th>';
-            headerHTML += '<th class="px-4 py-3 text-right bg-green-50 border-l border-green-200 font-bold text-green-800">Var. Absoluta ($)</th>';
-            headerHTML += '<th class="px-4 py-3 text-right bg-green-50 font-bold text-green-800">Var. Relativa (%)</th>';
-            headerHTML += '<th class="px-4 py-3 text-center font-bold bg-blue-900 text-white">CATEGORIZACIÓN</th>';
-            headerHTML += '</tr>';
-            thead.innerHTML = headerHTML;
-
-            // 2. PROCESAR Y FILTRAR DATOS
-            let categoryCounts = {
-                'BLACK': 0, 'ELITE': 0, 'PLATINO': 0, 'ORO': 0, 'PLATA': 0,
-                'CLÁSICOS': 0, 'REGULADOS': 0, 'PRODUCTOS SIN FRECUENCIA DE USO': 0
-            };
-            
-            let processedData = rawData.map(row => {
-                const desc = getColumnVal(row, ['descripción', 'descripcion']);
-                const valCompra = cleanCurrency(getColumnVal(row, ['valor máximo', 'valor maximo', 'ultimas vigencias'])); // VALOR MÁXIMO DE COMPRA (ULTIMAS VIGENCIAS)
-                const precio2025 = cleanCurrency(getColumnVal(row, ['precio 2025'])); // Precio 2025
-
-                const pareto = (getColumnVal(row, ['pareto', 'páreto']) || 'N/A').toUpperCase().trim();
-                const identA = (getColumnVal(row, ['identificación', 'identificacion', 'a+']) || '').toUpperCase();
-
-                // 1. COSTOS INDIRECTOS = VALOR MÁXIMO DE COMPRA * % INDIRECTOS (Sujeto a Sección IV)
-                const costosIndirectos = valCompra * (totalIndirectPercent / 100);
-
-                // 2. COSTO TOTAL = VALOR MÁXIMO DE COMPRA + COSTOS INDIRECTOS
-                const costoTotal = valCompra + costosIndirectos;
-
-                // 3. COSTO 2026 = COSTO TOTAL * INCREMENTO 2026
-                const costo2026 = costoTotal * (1 + (incrementPercent / 100));
-
-                let category = "SIN FRECUENCIA";
-                let badgeClass = "bg-slate-100 text-slate-500";
-                let tarifaVenta2026 = 0;
-
-                // Lógica de Categorización
-                if (pareto === 'A' && identA === 'SI') { category = "BLACK"; badgeClass = "bg-cat-black"; }
-                else if (pareto === 'A') { category = "ELITE"; badgeClass = "bg-cat-elite"; }
-                else if (pareto === 'B') { category = "ORO"; badgeClass = "bg-cat-oro"; }
-                else if (pareto === 'C') { category = "PLATA"; badgeClass = "bg-cat-plata"; }
-                else if (valCompra === 0) { category = "PRODUCTOS SIN FRECUENCIA DE USO"; badgeClass = "bg-cat-sinfreq"; }
-                else { category = "CLÁSICOS"; badgeClass = "bg-cat-clasicos"; }
-                
-                if (desc && desc.toLowerCase().includes('regulado')) { category = "REGULADOS"; badgeClass = "bg-cat-regulados"; }
-                
-                // 4. TARIFA DE VENTA 2026
-                if (category === "REGULADOS") {
-                    tarifaVenta2026 = precio2025; // Regulado no sube
-                } else {
-                    tarifaVenta2026 = precio2025 * (1 + (incrementPercent / 100)); // Precio 2026 calculado
-                }
-
-                // 5. NUEVOS CÁLCULOS SOLICITADOS (Variaciones)
-                const variacionAbsoluta = tarifaVenta2026 - precio2025;
-                const variacionRelativa = precio2025 !== 0 ? (variacionAbsoluta / precio2025) * 100 : 0;
-
-                if (categoryCounts.hasOwnProperty(category)) {
-                    categoryCounts[category]++;
-                } else {
-                    categoryCounts[category] = 1; 
-                }
-
-                return { 
-                    ...row, 
-                    _costosIndirectos: costosIndirectos,
-                    _costoTotal: costoTotal,
-                    _costo2026: costo2026,
-                    _tarifaVenta2026: tarifaVenta2026,
-                    _variacionAbsoluta: variacionAbsoluta,
-                    _variacionRelativa: variacionRelativa, 
-                    _category: category, 
-                    _badgeClass: badgeClass 
-                };
-            });
-            
-            // Guardar para exportación
-            currentExportData = processedData;
-
-            // 2.1 ACTUALIZAR BOTONES CON CONTEOS
-            renderFilterButtons(categoryCounts, processedData.length);
-
-            // 2.2 ACTUALIZAR GRÁFICAS (Dona y Barras)
-            updateCharacterizationChartsData(categoryCounts);
-
-            // 2.3 APLICAR FILTRO VISUAL
-            if (currentCategoryFilter !== 'ALL') {
-                processedData = processedData.filter(d => d._category === currentCategoryFilter);
-            }
-
-            const displayData = processedData.slice(0, 500);
-
-            // 3. RENDERIZAR FILAS
-            const html = displayData.map(d => {
-                let rowHTML = '<tr class="hover:bg-slate-50 transition-colors border-b border-slate-100">';
-                
-                // Celdas originales
-                originalHeaders.forEach(h => {
-                    let val = d[h];
-                    if (typeof val === 'number' && val > 1000) val = formatMoney(val);
-                    rowHTML += `<td class="px-4 py-2 truncate max-w-xs text-xs border-r border-slate-50" title="${val}">${val}</td>`;
-                });
-
-                // Celdas calculadas
-                rowHTML += `<td class="px-4 py-2 text-right text-xs bg-blue-50 text-slate-600">${formatMoney(d._costosIndirectos)}</td>`;
-                rowHTML += `<td class="px-4 py-2 text-right text-xs bg-blue-50 text-slate-700 font-semibold">${formatMoney(d._costoTotal)}</td>`;
-                rowHTML += `<td class="px-4 py-2 text-right text-xs bg-blue-50 text-slate-800 font-bold">${formatMoney(d._costo2026)}</td>`;
-                rowHTML += `<td class="px-4 py-2 text-right font-extrabold text-white bg-blue-800 text-xs shadow-inner border-l-2 border-white">${formatMoney(d._tarifaVenta2026)}</td>`;
-                // Nuevas celdas de variación
-                rowHTML += `<td class="px-4 py-2 text-right text-xs bg-green-50 text-green-700 font-bold border-l border-green-100">${formatMoney(d._variacionAbsoluta)}</td>`;
-                rowHTML += `<td class="px-4 py-2 text-right text-xs bg-green-50 text-green-700 font-bold">${d._variacionRelativa.toFixed(2)}%</td>`;
-                
-                rowHTML += `<td class="px-4 py-2 text-center"><span class="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${d._badgeClass}">${d._category}</span></td>`;
-                
-                rowHTML += '</tr>';
-                return rowHTML;
-            }).join('');
-            
-            tbody.innerHTML = html || '<tr><td colspan="100%" class="px-4 py-8 text-center text-slate-400">No hay productos en esta categoría.</td></tr>';
-        }
-
-        window.downloadCharacterizationExcel = function() {
-            if (!currentExportData || currentExportData.length === 0) {
-                alert("No hay datos para exportar. Cargue un archivo primero.");
-                return;
-            }
-
-            // Preparar datos planos para Excel
-            // Se debe incluir columnas originales + calculadas
-            const exportArray = currentExportData.map(d => {
-                const newRow = {};
-                
-                // 1. Columnas originales (Keys que no empiezan con _)
-                Object.keys(d).forEach(key => {
-                    if (!key.startsWith('_')) newRow[key] = d[key];
-                });
-
-                // 2. Columnas Calculadas
-                newRow['Costos Indirectos'] = d._costosIndirectos;
-                newRow['Costo Total'] = d._costoTotal;
-                newRow['Costo Proyectado 2026'] = d._costo2026;
-                newRow['Tarifa Venta 2026'] = d._tarifaVenta2026;
-                newRow['Variación Absoluta 25-26 ($)'] = d._variacionAbsoluta;
-                newRow['Variación Relativa 25-26 (%)'] = d._variacionRelativa / 100; // Para formato % en Excel si se desea
-                newRow['Categoría Final'] = d._category;
-
-                return newRow;
-            });
-
-            const ws = XLSX.utils.json_to_sheet(exportArray);
-            const wb = XLSX.utils.book_new();
-            // Nombre de hoja seguro
-            const sheetNameSafe = (document.getElementById('char-book-select').value || "Datos").substring(0, 30);
-            XLSX.utils.book_append_sheet(wb, ws, sheetNameSafe);
-            
-            XLSX.writeFile(wb, `Caracterizacion_${sheetNameSafe}_2026.xlsx`);
-        }
-
-        function renderFilterButtons(counts, total) {
-            const container = document.getElementById('category-filters');
-            const filters = [
-                { id: 'ALL', label: `TODOS (${total})`, class: 'bg-slate-600 text-white' },
-                { id: 'BLACK', label: `BLACK (${counts['BLACK']})`, class: 'bg-cat-black' },
-                { id: 'ELITE', label: `ELITE (${counts['ELITE']})`, class: 'bg-cat-elite' },
-                { id: 'PLATINO', label: `PLATINO (${counts['PLATINO']})`, class: 'bg-cat-platino' },
-                { id: 'ORO', label: `ORO (${counts['ORO']})`, class: 'bg-cat-oro' },
-                { id: 'PLATA', label: `PLATA (${counts['PLATA']})`, class: 'bg-cat-plata' },
-                { id: 'CLÁSICOS', label: `CLÁSICOS (${counts['CLÁSICOS']})`, class: 'bg-cat-clasicos' },
-                { id: 'REGULADOS', label: `REGULADOS (${counts['REGULADOS']})`, class: 'bg-cat-regulados' },
-                { id: 'PRODUCTOS SIN FRECUENCIA DE USO', label: `SIN FREQ. (${counts['PRODUCTOS SIN FRECUENCIA DE USO']})`, class: 'bg-cat-sinfreq' }
-            ];
-
-            container.innerHTML = filters.map(f => `
-                <button 
-                    class="filter-btn text-[10px] px-2 py-1 rounded-full uppercase ${f.class} ${currentCategoryFilter === f.id ? 'active scale-105 opacity-100' : ''}" 
-                    onclick="applyCategoryFilter('${f.id}', this)">
-                    ${f.label}
-                </button>
-            `).join('');
-        }
-
-        function updateCharacterizationChartsData(counts) {
-            // Orden específico para coherencia visual
-            const order = ['BLACK', 'ELITE', 'PLATINO', 'ORO', 'PLATA', 'CLÁSICOS', 'REGULADOS', 'PRODUCTOS SIN FRECUENCIA DE USO'];
-            const labels = order.filter(k => counts[k] > 0);
-            const data = labels.map(k => counts[k]);
-            
-            const colorMap = {
-                'BLACK': '#000000', 'ELITE': '#4b0082', 'PLATINO': '#e5e4e2',
-                'ORO': '#ffd700', 'PLATA': '#c0c0c0', 'CLÁSICOS': '#3b82f6',
-                'REGULADOS': '#10b981', 'PRODUCTOS SIN FRECUENCIA DE USO': '#ef4444'
-            };
-            const colors = labels.map(l => colorMap[l] || '#888');
-
-            // Actualizar Dona
-            if(characterizationChart) {
-                characterizationChart.data = {
-                    labels: labels,
-                    datasets: [{ data: data, backgroundColor: colors, borderWidth: 1 }]
-                };
-                characterizationChart.update();
-            }
-
-            // Actualizar Barras
-            if(characterizationBarChart) {
-                characterizationBarChart.data = {
-                    labels: labels,
-                    datasets: [{ 
-                        data: data, 
-                        backgroundColor: colors, 
-                        borderWidth: 1,
-                        borderRadius: 4
-                    }]
-                };
-                characterizationBarChart.update();
-            }
-        }
-
-        window.searchInventory = function() {
-            const sheetName = document.getElementById('inventory-book-select').value;
-            const query = document.getElementById('inventory-search-input').value;
-            if(!sheetName) { alert("Seleccione un libro primero."); return; }
-            renderInventoryTable(sheetName, query, currentParetoFilter);
-        }
-
-        window.clearInventorySearch = function() {
-            document.getElementById('inventory-search-input').value = "";
-            const sheetName = document.getElementById('inventory-book-select').value;
-            currentParetoFilter = 'ALL'; // Resetear filtros también
-            renderInventoryTable(sheetName, "");
-        }
-
-        function populateSelectors() {
-            const paretoSelect = document.getElementById('pareto-book-select');
-            const invSelect = document.getElementById('inventory-book-select');
-            // costSelect eliminado
-            const charSelect = document.getElementById('char-book-select'); 
-            
-            const currPareto = paretoSelect.value;
-            const currInv = invSelect.value;
-            const currChar = charSelect.value;
-
-            let opts = '<option value="">Seleccione...</option>';
-            let paretoOpts = '<option value="all">CONSOLIDADO GENERAL</option>';
-            
-            window.productGroups.forEach(g => {
-                opts += `<option value="${g.name}">${g.name}</option>`;
-                paretoOpts += `<option value="${g.name}">${g.name}</option>`;
-            });
-
-            invSelect.innerHTML = opts;
-            paretoSelect.innerHTML = paretoOpts;
-            charSelect.innerHTML = paretoOpts; // AHORA INCLUYE 'CONSOLIDADO GENERAL' (all)
-
-            if(window.productGroups.length > 0) {
-                if(!currInv) invSelect.value = window.productGroups[0].name;
-                if(!currChar) charSelect.value = window.productGroups[0].name;
-            }
-            if(currInv) invSelect.value = currInv;
-            if(currPareto) paretoSelect.value = currPareto;
-            if(currChar) charSelect.value = currChar;
-            
-            if(invSelect.value) renderInventoryTable(invSelect.value);
-            // Si ya hay data cargada y no se ha renderizado la tabla de caracterización, hazlo
-            if(charSelect.value && window.sheetsData[charSelect.value]) renderCharacterizationTable(charSelect.value);
-        }
-
-        // searchCostItem eliminado
-        // clearCostSearch eliminado
-
         function analyzeSheetSummary(data) {
             let totalCost = 0;
             const keys = Object.keys(data[0]);
@@ -1110,19 +950,13 @@
             const unitsKey = keys.find(k => k.toLowerCase().includes('unidades'));
             const paretoKey = keys.find(k => k.toLowerCase().includes('pareto'));
             let paretoCounts = {};
-
             data.forEach(row => {
                 const p = cleanCurrency(row[priceKey]);
                 const u = parseFloat(row[unitsKey]) || 0;
                 totalCost += (p * u);
-                if(paretoKey) {
-                    const cat = (row[paretoKey] || 'N/A').toString().trim().toUpperCase();
-                    paretoCounts[cat] = (paretoCounts[cat] || 0) + 1;
-                }
+                if(paretoKey) { const cat = (row[paretoKey] || 'N/A').toString().trim().toUpperCase(); paretoCounts[cat] = (paretoCounts[cat] || 0) + 1; }
             });
-
-            let topPareto = 'N/A';
-            let maxCount = 0;
+            let topPareto = 'N/A'; let maxCount = 0;
             Object.entries(paretoCounts).forEach(([k, v]) => { if(v > maxCount && k!=='N/A') { maxCount = v; topPareto = k; } });
             return { totalCost, totalRevenue: totalCost * 1.3, topPareto };
         }
@@ -1136,17 +970,13 @@
             return parseFloat(str) || 0;
         }
 
-        function onSuccessUpload(count) {
-            const status = document.getElementById('upload-status-text');
-            status.innerText = `${count} libros cargados`;
-            status.className = "text-xs text-green-600 font-bold";
-        }
-
-        function renderSummaryButtons() {
+        window.onSuccessUpload = function(count) { const status = document.getElementById('upload-status-text'); status.innerText = `${count} libros cargados`; status.className = "text-xs text-green-600 font-bold"; }
+        
+        window.renderSummaryButtons = function() {
             const container = document.getElementById('book-buttons-container');
             if (window.productGroups.length === 0) return;
             container.innerHTML = window.productGroups.map((group, idx) => `
-                <div class="group-btn" onclick="selectBookDetail(${idx}, this)">
+                <div class="group-btn" onclick="window.selectBookDetail(${idx}, this)">
                     <div class="text-3xl text-principal mb-2"><i class="fas fa-book-medical"></i></div>
                     <h3 class="font-bold text-slate-700 text-xs text-center leading-tight mb-1 break-words w-full">${group.name}</h3>
                     <span class="text-[0.65rem] text-slate-400 font-mono bg-slate-100 px-2 py-0.5 rounded-full">${group.count} Items</span>
@@ -1160,139 +990,59 @@
             const group = window.productGroups[index];
             const panel = document.getElementById('book-detail-panel');
             panel.classList.remove('hidden');
-            
-            // CÁLCULO DE VARIACIÓN (NUEVO)
-            // Variación $ = Venta Proyectada - Costo Total Inventario
-            // Nota: group.revenue es el valor de venta estimado (costo * 1.3 en el ejemplo actual, pero viene de data real si existiera)
             const variation = group.revenue - group.cost;
-
             document.getElementById('detail-title').innerText = group.name;
             document.getElementById('detail-items-badge').innerText = `${group.count} Ítems`;
             document.getElementById('detail-cost').innerText = formatMoney(group.cost);
             document.getElementById('detail-revenue').innerText = formatMoney(group.revenue);
-            
-            // Actualización de la tarjeta de Variación
             const varElement = document.getElementById('detail-variation');
             varElement.innerText = formatMoney(variation);
-            // Color condicional simple
-            if(variation >= 0) varElement.className = "text-xl font-bold text-green-600";
-            else varElement.className = "text-xl font-bold text-red-600";
-
+            if(variation >= 0) varElement.className = "text-xl font-bold text-green-600"; else varElement.className = "text-xl font-bold text-red-600";
             document.getElementById('inventory-book-select').value = group.name;
-            renderInventoryTable(group.name);
+            window.renderInventoryTable(group.name);
             document.getElementById('char-book-select').value = group.name;
-            renderCharacterizationTable(group.name);
+            window.renderCharacterizationTable(group.name);
         }
 
         window.updateParetoBySheet = function(sheetName) {
             let aggregatedCounts = {};
-            const processData = (arr) => {
-                if(!arr || arr.length === 0) return;
-                arr.forEach(row => {
-                    let cat = getColumnVal(row, ['pareto', 'páreto', 'clasificación', 'clasificacion']);
-                    cat = (cat || 'SIN CLASIFICAR').toString().trim().toUpperCase();
-                    if(cat === '') cat = 'SIN CLASIFICAR';
-                    aggregatedCounts[cat] = (aggregatedCounts[cat] || 0) + 1;
-                });
-            };
-
-            if(sheetName === 'all') {
-                if (window.sheetsData) Object.values(window.sheetsData).forEach(arr => processData(arr));
-            } else if(window.sheetsData && window.sheetsData[sheetName]) {
-                processData(window.sheetsData[sheetName]);
-            }
-
+            const processData = (arr) => { if(!arr || arr.length === 0) return; arr.forEach(row => { let cat = getColumnVal(row, ['pareto', 'páreto', 'clasificación', 'clasificacion']); cat = (cat || 'SIN CLASIFICAR').toString().trim().toUpperCase(); if(cat === '') cat = 'SIN CLASIFICAR'; aggregatedCounts[cat] = (aggregatedCounts[cat] || 0) + 1; }); };
+            if(sheetName === 'all') { if (window.sheetsData) Object.values(window.sheetsData).forEach(arr => processData(arr)); } else if(window.sheetsData && window.sheetsData[sheetName]) { processData(window.sheetsData[sheetName]); }
             const labels = Object.keys(aggregatedCounts).sort();
             const counts = labels.map(k => aggregatedCounts[k]);
             updateChartsData(labels, counts);
         }
 
-        let paretoChart, pieChart;
-        const colors = ['#312782', '#008041', '#EC268F', '#fbbf24', '#60a5fa', '#94a3b8'];
-
-        function initCharts() {
-            const commonOptions = {
-                responsive: true,
-                maintainAspectRatio: false,
-                onClick: (e, elements, chart) => {
-                    if (elements && elements.length > 0) {
-                        const index = elements[0].index;
-                        const label = chart.data.labels[index];
-                        // Filtra la tabla de Inventario (Sección III)
-                        currentParetoFilter = label;
-                        const activeBook = document.getElementById('inventory-book-select').value;
-                        if(activeBook) {
-                            renderInventoryTable(activeBook, "", label);
-                            // Scroll suave a la tabla
-                            document.getElementById('section-detalle-items').scrollIntoView({behavior: 'smooth'});
-                        }
-                    }
-                }
-            };
-
+        window.initCharts = function() {
+            const colors = ['#312782', '#008041', '#EC268F', '#fbbf24', '#60a5fa', '#94a3b8'];
+            const commonOptions = { responsive: true, maintainAspectRatio: false, onClick: (e, elements, chart) => { if (elements && elements.length > 0) { const index = elements[0].index; const label = chart.data.labels[index]; currentParetoFilter = label; const activeBook = document.getElementById('inventory-book-select').value; if(activeBook) { window.renderInventoryTable(activeBook, "", label); document.getElementById('section-detalle-items').scrollIntoView({behavior: 'smooth'}); } } } };
             const ctx1 = document.getElementById('paretoChart').getContext('2d');
-            paretoChart = new Chart(ctx1, { 
-                type: 'bar', 
-                data: { labels: [], datasets: [{ label: 'Conteo', data: [], backgroundColor: colors }] }, 
-                options: { ...commonOptions, plugins: { legend: { display: false } } } 
-            });
-            
+            paretoChart = new Chart(ctx1, { type: 'bar', data: { labels: [], datasets: [{ label: 'Conteo', data: [], backgroundColor: colors }] }, options: { ...commonOptions, plugins: { legend: { display: false } } } });
             const ctx2 = document.getElementById('paretoPieChart').getContext('2d');
-            pieChart = new Chart(ctx2, { 
-                type: 'doughnut', 
-                data: { labels: [], datasets: [{ data: [], backgroundColor: colors }] }, 
-                options: { ...commonOptions, plugins: { legend: { position: 'right' } } } 
-            });
+            pieChart = new Chart(ctx2, { type: 'doughnut', data: { labels: [], datasets: [{ data: [], backgroundColor: colors }] }, options: { ...commonOptions, plugins: { legend: { position: 'right' } } } });
         }
 
-        function updateChartsData(l, c) {
-            if(paretoChart) { paretoChart.data.labels = l; paretoChart.data.datasets[0].data = c; paretoChart.update(); }
-            if(pieChart) { pieChart.data.labels = l; pieChart.data.datasets[0].data = c; pieChart.update(); }
-        }
-
+        function updateChartsData(l, c) { if(paretoChart) { paretoChart.data.labels = l; paretoChart.data.datasets[0].data = c; paretoChart.update(); } if(pieChart) { pieChart.data.labels = l; pieChart.data.datasets[0].data = c; pieChart.update(); } }
+        
         function formatMoney(n) { return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n); }
-
-        function renderCostStructure() {
+        
+        window.renderCostStructure = function() {
             const tbody = document.getElementById('cost-structure-body');
             let totalPercent = 0;
-
-            tbody.innerHTML = window.costStructure.map((i, idx) => {
-                totalPercent += i.percent;
-                return `
-                <tr><td class="px-4 py-2 text-slate-700">${i.name}</td>
-                <td class="px-4 py-2 text-right"><input type="number" id="cost-input-${idx}" value="${i.percent}" onchange="updateCost(${idx}, this.value)" class="table-input w-20 text-right"> %</td>
-                </tr>
-            `}).join('');
-
+            tbody.innerHTML = window.costStructure.map((i, idx) => { totalPercent += i.percent; return `<tr><td class="px-4 py-2 text-slate-700">${i.name}</td><td class="px-4 py-2 text-right"><input type="number" id="cost-input-${idx}" value="${i.percent}" onchange="window.updateCost(${idx}, this.value)" class="table-input w-20 text-right"> %</td></tr>`}).join('');
             document.getElementById('total-indirect-percent').innerText = totalPercent.toFixed(2) + "%";
         }
-
-        window.updateCost = (i,v) => { 
-            window.costStructure[i].percent = parseFloat(v)||0; 
-            renderCostStructure(); 
-            // IMPORTANTE: Al cambiar costos, debemos actualizar la tabla de caracterización si está visible
-            const currentBook = document.getElementById('char-book-select').value;
-            if(currentBook) renderCharacterizationTable(currentBook);
-
-            if(window.saveDataToFirebase) window.saveDataToFirebase(); 
-        };
-
-        function renderSignatures() {
-            document.getElementById('signatures-body').innerHTML = window.signatures.map((s, idx) => `
-                <tr>
-                    <td class="p-2"><input id="sig-role-${idx}" value="${s.role}" onchange="upSig(${idx},'role',this.value)" class="table-input"></td>
-                    <td class="p-2"><input id="sig-name-${idx}" value="${s.name}" onchange="upSig(${idx},'name',this.value)" class="table-input"></td>
-                    <td class="p-2"><input id="sig-cargo-${idx}" value="${s.cargo}" onchange="upSig(${idx},'cargo',this.value)" class="table-input"></td>
-                    <td class="p-2 text-center"><button onclick="rmSig(${idx})" class="text-red-500"><i class="fas fa-trash"></i></button></td>
-                </tr>
-            `).join('');
-        }
+        
+        window.updateCost = (i,v) => { window.costStructure[i].percent = parseFloat(v)||0; window.renderCostStructure(); const currentBook = document.getElementById('char-book-select').value; if(currentBook) window.renderCharacterizationTable(currentBook); if(window.saveDataToFirebase) window.saveDataToFirebase(); };
+        
+        window.renderSignatures = function() { document.getElementById('signatures-body').innerHTML = window.signatures.map((s, idx) => `<tr><td class="p-2"><input id="sig-role-${idx}" value="${s.role}" onchange="window.upSig(${idx},'role',this.value)" class="table-input"></td><td class="p-2"><input id="sig-name-${idx}" value="${s.name}" onchange="window.upSig(${idx},'name',this.value)" class="table-input"></td><td class="p-2"><input id="sig-cargo-${idx}" value="${s.cargo}" onchange="window.upSig(${idx},'cargo',this.value)" class="table-input"></td><td class="p-2 text-center"><button onclick="window.rmSig(${idx})" class="text-red-500"><i class="fas fa-trash"></i></button></td></tr>`).join(''); }
+        
         window.upSig = (i,f,v) => { window.signatures[i][f]=v; if(window.saveDataToFirebase) window.saveDataToFirebase(); };
-        window.addSignature = () => { window.signatures.push({role:'REVISÓ',name:'',cargo:''}); renderSignatures(); if(window.saveDataToFirebase) window.saveDataToFirebase(); };
-        window.rmSig = (i) => { if(confirm('¿Borrar?')){ window.signatures.splice(i,1); renderSignatures(); if(window.saveDataToFirebase) window.saveDataToFirebase(); } };
+        window.addSignature = () => { window.signatures.push({role:'REVISÓ',name:'',cargo:''}); window.renderSignatures(); if(window.saveDataToFirebase) window.saveDataToFirebase(); };
+        window.rmSig = (i) => { if(confirm('¿Borrar?')){ window.signatures.splice(i,1); window.renderSignatures(); if(window.saveDataToFirebase) window.saveDataToFirebase(); } };
 
-        // --- GENERACIÓN DE REPORTE COMPLETO PDF ---
         window.generateFullReport = async () => {
+            if (!window.jspdf) { alert("Librería jsPDF no cargada."); return; }
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
             
@@ -1306,34 +1056,18 @@
 
             // --- HELPER: HEADER ---
             const drawHeader = (doc) => {
-                // Fondo Azul Institucional
                 doc.setFillColor(49, 39, 130); 
                 doc.rect(0, 0, pageWidth, 28, 'F');
-                
-                // Logo
-                if(Logo_HUHMP_Blanco) {
-                    try { doc.addImage(Logo_HUHMP_Blanco, 'PNG', 10, 4, 20, 20); } catch(e){}
-                }
-
-                // Títulos
+                if(Logo_HUHMP_Blanco) { try { doc.addImage(Logo_HUHMP_Blanco, 'PNG', 10, 4, 20, 20); } catch(e){} }
                 doc.setTextColor(255, 255, 255);
-                doc.setFont("helvetica", "bold");
-                doc.setFontSize(14);
-                doc.text("INFORME TÉCNICO DE TARIFAS FARMACÉUTICAS 2026", 40, 12);
-                
-                doc.setFontSize(9);
-                doc.setFont("helvetica", "normal");
-                doc.text("ESE Hospital Universitario Hernando Moncaleano Perdomo", 40, 18);
-                doc.text("Código: GD-SGI-M-005 | Versión: 01", 40, 23);
+                doc.setFont("helvetica", "bold"); doc.setFontSize(14); doc.text("INFORME TÉCNICO DE TARIFAS FARMACÉUTICAS 2026", 40, 12);
+                doc.setFontSize(9); doc.setFont("helvetica", "normal"); doc.text("ESE Hospital Universitario Hernando Moncaleano Perdomo", 40, 18); doc.text("Código: GD-SGI-M-005 | Versión: 01", 40, 23);
             };
 
             // --- HELPER: FOOTER ---
             const drawFooter = (doc, pageNum, pageCount) => {
-                doc.setDrawColor(200);
-                doc.line(10, pageHeight - 15, pageWidth - 10, pageHeight - 15);
-                doc.setFontSize(7);
-                doc.setTextColor(100);
-                doc.text(`Generado: ${currentDate}`, 15, pageHeight - 10);
+                doc.setDrawColor(200); doc.line(10, pageHeight - 15, pageWidth - 10, pageHeight - 15);
+                doc.setFontSize(7); doc.setTextColor(100); doc.text(`Generado: ${currentDate}`, 15, pageHeight - 10);
                 doc.text(`Página ${pageNum} de ${pageCount}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
                 doc.text(`Consecutivo: ${consecutive}`, pageWidth - 15, pageHeight - 10, { align: 'right' });
             };
@@ -1343,292 +1077,295 @@
 
             // 1. TÍTULO DEL REPORTE
             drawHeader(doc);
-            doc.setTextColor(49, 39, 130);
-            doc.setFontSize(16);
-            doc.setFont("helvetica", "bold");
-            doc.text("ANÁLISIS ESTRUCTURAL DE COSTOS Y TARIFAS", margins.left, currentY);
-            currentY += 10;
-            
-            doc.setFontSize(10);
-            doc.setFont("helvetica", "normal");
-            doc.setTextColor(50);
-            doc.text("El presente documento detalla la metodología, análisis de datos y proyección tarifaria para la vigencia 2026, conforme a los lineamientos institucionales y regulatorios.", margins.left, currentY, { maxWidth: pageWidth - 30 });
-            currentY += 15;
+            doc.setTextColor(49, 39, 130); doc.setFontSize(16); doc.setFont("helvetica", "bold");
+            doc.text("ANÁLISIS ESTRUCTURAL DE COSTOS Y TARIFAS", margins.left, currentY); currentY += 10;
+            doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.setTextColor(50);
+            doc.text("El presente documento detalla la metodología, análisis de datos y proyección tarifaria para la vigencia 2026, conforme a los lineamientos institucionales y regulatorios.", margins.left, currentY, { maxWidth: pageWidth - 30 }); currentY += 15;
 
             // --- SECCIÓN I: RESUMEN DE PRODUCTOS ---
-            doc.setFillColor(240, 240, 245);
-            doc.rect(margins.left, currentY - 5, pageWidth - 30, 8, 'F');
-            doc.setTextColor(49, 39, 130);
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(11);
-            doc.text("I. RESUMEN DE PRODUCTOS POR TIPO", margins.left + 2, currentY);
-            currentY += 5;
-
-            const summaryBody = window.productGroups.map(g => [
-                g.name, 
-                g.count, 
-                formatMoney(g.cost), 
-                formatMoney(g.revenue)
-            ]);
-
-            doc.autoTable({
-                startY: currentY,
-                head: [['Libro / Fuente', 'Cant. Ítems', 'Costo Total Inventario', 'Venta Proyectada']],
-                body: summaryBody,
-                theme: 'striped',
-                headStyles: { fillColor: [49, 39, 130], textColor: 255, fontSize: 8 },
-                bodyStyles: { fontSize: 8 },
-                columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' } },
-                margin: { left: margins.left, right: margins.right }
-            });
+            doc.setFillColor(240, 240, 245); doc.rect(margins.left, currentY - 5, pageWidth - 30, 8, 'F');
+            doc.setTextColor(49, 39, 130); doc.setFont("helvetica", "bold"); doc.setFontSize(11);
+            doc.text("I. RESUMEN DE PRODUCTOS POR TIPO", margins.left + 2, currentY); currentY += 5;
+            const summaryBody = window.productGroups.map(g => [ g.name, g.count, formatMoney(g.cost), formatMoney(g.revenue) ]);
+            doc.autoTable({ startY: currentY, head: [['Libro / Fuente', 'Cant. Ítems', 'Costo Total Inventario', 'Venta Proyectada']], body: summaryBody, theme: 'striped', headStyles: { fillColor: [49, 39, 130], textColor: 255, fontSize: 8 }, bodyStyles: { fontSize: 8 }, columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' } }, margin: { left: margins.left, right: margins.right } });
             currentY = doc.lastAutoTable.finalY + 15;
 
             // --- SECCIÓN II: PARETO ---
-            doc.setFillColor(240, 240, 245);
-            doc.rect(margins.left, currentY - 5, pageWidth - 30, 8, 'F');
-            doc.setTextColor(49, 39, 130);
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(11);
-            doc.text("II. ANÁLISIS DE PARETO", margins.left + 2, currentY);
-            currentY += 10;
-
-            // Capturar Gráfica Pareto (si existe)
-            try {
-                const canvas = document.getElementById('paretoChart');
-                if (canvas) {
-                    const imgData = canvas.toDataURL('image/png');
-                    // Ajustar tamaño para que quepa
-                    const imgWidth = 120; 
-                    const imgHeight = 60;
-                    doc.addImage(imgData, 'PNG', margins.left, currentY, imgWidth, imgHeight);
-                    
-                    // Tabla Resumen Pareto al lado
-                    const paretoSummary = [];
-                    // Calcular resumen rápido de todos los datos
-                    let counts = {A:0, B:0, C:0};
-                    Object.values(window.sheetsData).forEach(sheet => {
-                        sheet.forEach(row => {
-                            let p = getColumnVal(row, ['pareto', 'páreto']);
-                            if(p) {
-                                p = p.toString().toUpperCase().trim();
-                                if(counts[p] !== undefined) counts[p]++;
-                            }
-                        });
-                    });
-                    const totalPareto = counts.A + counts.B + counts.C || 1;
-                    
-                    doc.autoTable({
-                        startY: currentY,
-                        head: [['Tipo', 'Ítems', 'Part. %']],
-                        body: [
-                            ['A (Vitales)', counts.A, ((counts.A/totalPareto)*100).toFixed(1)+'%'],
-                            ['B (Esenciales)', counts.B, ((counts.B/totalPareto)*100).toFixed(1)+'%'],
-                            ['C (No Esenciales)', counts.C, ((counts.C/totalPareto)*100).toFixed(1)+'%']
-                        ],
-                        theme: 'grid',
-                        margin: { left: margins.left + 130 },
-                        tableWidth: 50,
-                        headStyles: { fillColor: [100, 100, 100], fontSize: 8 },
-                        bodyStyles: { fontSize: 8 }
-                    });
-                    
-                    currentY += 70; // Espacio de la gráfica
-                }
-            } catch(e) { console.error("Error Pareto img", e); }
+            doc.setFillColor(240, 240, 245); doc.rect(margins.left, currentY - 5, pageWidth - 30, 8, 'F');
+            doc.setTextColor(49, 39, 130); doc.setFont("helvetica", "bold"); doc.setFontSize(11);
+            doc.text("II. ANÁLISIS DE PARETO", margins.left + 2, currentY); currentY += 10;
+            try { const canvas = document.getElementById('paretoChart'); if (canvas) { const imgData = canvas.toDataURL('image/png'); const imgWidth = 120; const imgHeight = 60; doc.addImage(imgData, 'PNG', margins.left, currentY, imgWidth, imgHeight); let counts = {A:0, B:0, C:0}; Object.values(window.sheetsData).forEach(sheet => { sheet.forEach(row => { let p = getColumnVal(row, ['pareto', 'páreto']); if(p) { p = p.toString().toUpperCase().trim(); if(counts[p] !== undefined) counts[p]++; } }); }); const totalPareto = counts.A + counts.B + counts.C || 1; doc.autoTable({ startY: currentY, head: [['Tipo', 'Ítems', 'Part. %']], body: [ ['A (Vitales)', counts.A, ((counts.A/totalPareto)*100).toFixed(1)+'%'], ['B (Esenciales)', counts.B, ((counts.B/totalPareto)*100).toFixed(1)+'%'], ['C (No Esenciales)', counts.C, ((counts.C/totalPareto)*100).toFixed(1)+'%'] ], theme: 'grid', margin: { left: margins.left + 130 }, tableWidth: 50, headStyles: { fillColor: [100, 100, 100], fontSize: 8 }, bodyStyles: { fontSize: 8 } }); currentY += 70; } } catch(e) { console.error("Error Pareto img", e); }
 
             // --- SECCIÓN III: DETALLE DE ÍTEMS ---
-            // Verificar espacio en página
             if (currentY > pageHeight - 50) { doc.addPage(); drawHeader(doc); currentY = margins.top; }
-
-            doc.setFillColor(240, 240, 245);
-            doc.rect(margins.left, currentY - 5, pageWidth - 30, 8, 'F');
-            doc.setTextColor(49, 39, 130);
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(11);
-            doc.text("III. DETALLE DE ÍTEMS FARMACÉUTICOS (Muestra)", margins.left + 2, currentY);
-            currentY += 5;
-
-            // Obtener datos del libro seleccionado o el primero
-            let selectedSheet = document.getElementById('inventory-book-select').value;
-            if(!selectedSheet && window.productGroups.length > 0) selectedSheet = window.productGroups[0].name;
-            
-            let itemsData = [];
-            if(selectedSheet && window.sheetsData[selectedSheet]) {
-                doc.setFontSize(8);
-                doc.setTextColor(100);
-                doc.text(`Fuente: ${selectedSheet} | Mostrando primeros 200 registros por optimización.`, margins.left, currentY + 4);
-                currentY += 6;
-                
-                // Mapear datos para tabla
-                itemsData = window.sheetsData[selectedSheet].slice(0, 200).map(row => [
-                    getColumnVal(row, ['código', 'codigo']),
-                    String(getColumnVal(row, ['descripción', 'descripcion'])).substring(0, 40),
-                    formatMoney(cleanCurrency(getColumnVal(row, ['precio 2025']))),
-                    getColumnVal(row, ['unidades', 'n° unidades']),
-                    formatMoney(cleanCurrency(getColumnVal(row, ['valor máximo', 'valor maximo']))),
-                    getColumnVal(row, ['pareto', 'páreto'])
-                ]);
-            } else {
-                itemsData = [['-', 'No hay datos seleccionados o cargados', '-', '-', '-', '-']];
-            }
-
-            doc.autoTable({
-                startY: currentY,
-                head: [['Código', 'Descripción', 'Precio 2025', 'Unds', 'Valor Compra', 'Clas.']],
-                body: itemsData,
-                theme: 'plain',
-                styles: { fontSize: 7, cellPadding: 1 },
-                headStyles: { fillColor: [220, 220, 220], textColor: 50, fontStyle: 'bold' },
-                columnStyles: { 
-                    1: { cellWidth: 70 },
-                    2: { halign: 'right' },
-                    3: { halign: 'right' },
-                    4: { halign: 'right' },
-                    5: { halign: 'center' }
-                },
-                margin: { left: margins.left, right: margins.right }
-            });
-            currentY = doc.lastAutoTable.finalY + 15;
+            doc.setFillColor(240, 240, 245); doc.rect(margins.left, currentY - 5, pageWidth - 30, 8, 'F');
+            doc.setTextColor(49, 39, 130); doc.setFont("helvetica", "bold"); doc.setFontSize(11);
+            doc.text("III. DETALLE DE ÍTEMS FARMACÉUTICOS (Muestra)", margins.left + 2, currentY); currentY += 5;
+            let selectedSheet = document.getElementById('inventory-book-select').value; if(!selectedSheet && window.productGroups.length > 0) selectedSheet = window.productGroups[0].name; let itemsData = []; if(selectedSheet && window.sheetsData[selectedSheet]) { doc.setFontSize(8); doc.setTextColor(100); doc.text(`Fuente: ${selectedSheet} | Mostrando primeros 200 registros por optimización.`, margins.left, currentY + 4); currentY += 6; itemsData = window.sheetsData[selectedSheet].slice(0, 200).map(row => [ getColumnVal(row, ['código', 'codigo']), String(getColumnVal(row, ['descripción', 'descripcion'])).substring(0, 40), formatMoney(cleanCurrency(getColumnVal(row, ['precio 2025']))), getColumnVal(row, ['unidades', 'n° unidades']), formatMoney(cleanCurrency(getColumnVal(row, ['valor máximo', 'valor maximo']))), getColumnVal(row, ['pareto', 'páreto']) ]); } else { itemsData = [['-', 'No hay datos seleccionados o cargados', '-', '-', '-', '-']]; }
+            doc.autoTable({ startY: currentY, head: [['Código', 'Descripción', 'Precio 2025', 'Unds', 'Valor Compra', 'Clas.']], body: itemsData, theme: 'plain', styles: { fontSize: 7, cellPadding: 1 }, headStyles: { fillColor: [220, 220, 220], textColor: 50, fontStyle: 'bold' }, columnStyles: { 1: { cellWidth: 70 }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'center' } }, margin: { left: margins.left, right: margins.right } }); currentY = doc.lastAutoTable.finalY + 15;
 
             // --- SECCIÓN IV: COSTOS INDIRECTOS ---
             if (currentY > pageHeight - 60) { doc.addPage(); drawHeader(doc); currentY = margins.top; }
-
-            doc.setFillColor(240, 240, 245);
-            doc.rect(margins.left, currentY - 5, pageWidth - 30, 8, 'F');
-            doc.setTextColor(49, 39, 130);
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(11);
-            doc.text("IV. ESTRUCTURA DE COSTOS INDIRECTOS", margins.left + 2, currentY);
-            currentY += 5;
-
-            const costBody = window.costStructure.map(c => [c.name, c.percent + " %"]);
-            const totalInd = window.costStructure.reduce((a,b) => a + b.percent, 0).toFixed(2);
-            costBody.push(['TOTAL RECUPERACIÓN INDIRECTA', totalInd + " %"]);
-
-            doc.autoTable({
-                startY: currentY,
-                head: [['Rubro de Costo', 'Porcentaje Asignado']],
-                body: costBody,
-                theme: 'grid',
-                tableWidth: 100,
-                headStyles: { fillColor: [49, 39, 130], textColor: 255 },
-                didParseCell: function(data) {
-                    if (data.row.index === costBody.length - 1) data.cell.styles.fontStyle = 'bold';
-                },
-                margin: { left: margins.left }
-            });
-            currentY = doc.lastAutoTable.finalY + 15;
+            doc.setFillColor(240, 240, 245); doc.rect(margins.left, currentY - 5, pageWidth - 30, 8, 'F');
+            doc.setTextColor(49, 39, 130); doc.setFont("helvetica", "bold"); doc.setFontSize(11);
+            doc.text("IV. ESTRUCTURA DE COSTOS INDIRECTOS", margins.left + 2, currentY); currentY += 5;
+            const costBody = window.costStructure.map(c => [c.name, c.percent + " %"]); const totalInd = window.costStructure.reduce((a,b) => a + b.percent, 0).toFixed(2); costBody.push(['TOTAL RECUPERACIÓN INDIRECTA', totalInd + " %"]);
+            doc.autoTable({ startY: currentY, head: [['Rubro de Costo', 'Porcentaje Asignado']], body: costBody, theme: 'grid', tableWidth: 100, headStyles: { fillColor: [49, 39, 130], textColor: 255 }, didParseCell: function(data) { if (data.row.index === costBody.length - 1) data.cell.styles.fontStyle = 'bold'; }, margin: { left: margins.left } }); currentY = doc.lastAutoTable.finalY + 15;
 
             // --- SECCIÓN V: CARACTERIZACIÓN (RESULTADOS) ---
             doc.addPage(); drawHeader(doc); currentY = margins.top;
-            
-            doc.setFillColor(240, 240, 245);
-            doc.rect(margins.left, currentY - 5, pageWidth - 30, 8, 'F');
-            doc.setTextColor(49, 39, 130);
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(11);
-            doc.text("V. CARACTERIZACIÓN Y PROYECCIÓN 2026", margins.left + 2, currentY);
-            currentY += 5;
+            doc.setFillColor(240, 240, 245); doc.rect(margins.left, currentY - 5, pageWidth - 30, 8, 'F');
+            doc.setTextColor(49, 39, 130); doc.setFont("helvetica", "bold"); doc.setFontSize(11);
+            doc.text("V. CARACTERIZACIÓN Y PROYECCIÓN 2026", margins.left + 2, currentY); currentY += 5;
+            let charData = []; if (window.currentExportData && window.currentExportData.length > 0) { doc.setFontSize(8); doc.setTextColor(100); doc.text(`Base de cálculo: ${selectedSheet} | Incremento aplicado: ${document.getElementById('increment-percent').value}% | Muestra parcial.`, margins.left, currentY + 4); currentY += 6; charData = window.currentExportData.slice(0, 150).map(row => [ getColumnVal(row, ['código', 'codigo']), String(getColumnVal(row, ['descripción', 'descripcion'])).substring(0, 30), formatMoney(row._costoTotal), formatMoney(row._tarifaVenta2026), row._variacionRelativa.toFixed(1) + '%', row._category ]); } else { charData = [['-', 'Debe visualizar la sección V en la app primero', '-', '-', '-', '-']]; }
+            doc.autoTable({ startY: currentY, head: [['Cód', 'Descripción', 'Costo Tot', 'Tarifa 2026', 'Var %', 'Categoría']], body: charData, theme: 'striped', styles: { fontSize: 7 }, headStyles: { fillColor: [0, 128, 65] }, columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } }, margin: { left: margins.left, right: margins.right } }); currentY = doc.lastAutoTable.finalY + 15;
 
-            // Usar window.currentExportData si existe (datos calculados de la tabla V)
-            let charData = [];
-            if (window.currentExportData && window.currentExportData.length > 0) {
-                 doc.setFontSize(8);
-                doc.setTextColor(100);
-                doc.text(`Base de cálculo: ${selectedSheet} | Incremento aplicado: ${document.getElementById('increment-percent').value}% | Muestra parcial.`, margins.left, currentY + 4);
-                currentY += 6;
-
-                charData = window.currentExportData.slice(0, 150).map(row => [
-                    getColumnVal(row, ['código', 'codigo']),
-                    String(getColumnVal(row, ['descripción', 'descripcion'])).substring(0, 30),
-                    formatMoney(row._costoTotal),
-                    formatMoney(row._tarifaVenta2026),
-                    row._variacionRelativa.toFixed(1) + '%',
-                    row._category
-                ]);
-            } else {
-                charData = [['-', 'Debe visualizar la sección V en la app primero', '-', '-', '-', '-']];
-            }
-
-            doc.autoTable({
-                startY: currentY,
-                head: [['Cód', 'Descripción', 'Costo Tot', 'Tarifa 2026', 'Var %', 'Categoría']],
-                body: charData,
-                theme: 'striped',
-                styles: { fontSize: 7 },
-                headStyles: { fillColor: [0, 128, 65] }, // Verde secundario
-                columnStyles: { 
-                    2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } 
-                },
-                margin: { left: margins.left, right: margins.right }
-            });
-            currentY = doc.lastAutoTable.finalY + 15;
-
-            // --- SECCIÓN CONCLUSIONES (AUTOMÁTICAS) ---
-            if (currentY > pageHeight - 80) { doc.addPage(); drawHeader(doc); currentY = margins.top; }
+            // --- NUEVO: RESUMEN GERENCIAL (SECCIÓN VII) ---
+            // Este resumen se coloca ANTES de las firmas, como solicitado.
+            if (currentY > pageHeight - 100) { doc.addPage(); drawHeader(doc); currentY = margins.top; }
 
             doc.setFillColor(240, 240, 245);
             doc.rect(margins.left, currentY - 5, pageWidth - 30, 8, 'F');
             doc.setTextColor(49, 39, 130);
             doc.setFont("helvetica", "bold");
             doc.setFontSize(11);
-            doc.text("CONCLUSIONES DEL MODELO", margins.left + 2, currentY);
+            doc.text("RESUMEN GERENCIAL DE TARIFAS (CONSOLIDADO)", margins.left + 2, currentY);
             currentY += 10;
 
-            doc.setFont("helvetica", "normal");
-            doc.setFontSize(10);
-            doc.setTextColor(20);
+            const finalizedKeys = Object.keys(window.finalizedAnalysis);
+            if (finalizedKeys.length > 0) {
+                const summaryRows = finalizedKeys.map(key => {
+                    const d = window.finalizedAnalysis[key];
+                    return [
+                        key,
+                        d.items,
+                        d.increment + " %",
+                        formatMoney(d.totalCost),
+                        formatMoney(d.totalRevenue26),
+                        formatMoney(d.margin)
+                    ];
+                });
 
-            const conclusions = [
-                `1. SOSTENIBILIDAD FINANCIERA: La estructura de costos definida incorpora un margen de recuperación indirecta del ${totalInd}%, distribuido en mano de obra, logística y administración. Este margen permite mitigar la carga operativa sobre el costo directo del medicamento, asegurando que la tarifa 2026 cubra no solo la adquisición sino la gestión del servicio farmacéutico.`,
-                "",
-                `2. EFICIENCIA PARETO Y FLUJO DE CAJA: El análisis evidencia que la gestión de inventarios debe focalizarse estrictamente en los productos Tipo A (Vitales/Elite). Al aplicar políticas de "Justo a Tiempo" en este segmento, la institución optimizará su capital de trabajo, reduciendo costos de almacenamiento en referencias de alto valor unitario.`,
-                "",
-                `3. IMPACTO TARIFARIO Y REGULACIÓN: La caracterización de bienes permite discriminar entre productos regulados y de mercado libre. La proyección tarifaria respeta los techos de precios para medicamentos regulados (CNPMDM), mientras que en los productos de libre competencia (Clásicos/Plata) se aplica un incremento indexado para proteger la rentabilidad ante la inflación del sector salud.`
-            ];
+                // Calcular Totales Generales
+                const grandTotalCost = finalizedKeys.reduce((s, k) => s + window.finalizedAnalysis[k].totalCost, 0);
+                const grandTotalRev = finalizedKeys.reduce((s, k) => s + window.finalizedAnalysis[k].totalRevenue26, 0);
+                summaryRows.push([
+                    'TOTAL CONSOLIDADO', 
+                    '', 
+                    '', 
+                    formatMoney(grandTotalCost), 
+                    formatMoney(grandTotalRev), 
+                    formatMoney(grandTotalRev - grandTotalCost)
+                ]);
 
-            doc.text(conclusions, margins.left, currentY, { maxWidth: pageWidth - 30, align: "justify" });
-            currentY += 50;
+                doc.autoTable({
+                    startY: currentY,
+                    head: [['Libro', 'Ítems', 'Inc. %', 'Costo Total', 'Venta 2026 (Proy)', 'Margen Neto']],
+                    body: summaryRows,
+                    theme: 'grid',
+                    headStyles: { fillColor: [20, 80, 160], textColor: 255 },
+                    columnStyles: { 
+                        3: { halign: 'right' }, 
+                        4: { halign: 'right' }, 
+                        5: { halign: 'right', fontStyle: 'bold' } 
+                    },
+                    didParseCell: function(data) {
+                        if (data.row.index === summaryRows.length - 1) {
+                            data.cell.styles.fillColor = [220, 230, 240];
+                            data.cell.styles.fontStyle = 'bold';
+                        }
+                    }
+                });
+                currentY = doc.lastAutoTable.finalY + 20;
 
-            // --- SECCIÓN VI: FIRMAS ---
-            if (currentY > pageHeight - 40) { doc.addPage(); drawHeader(doc); currentY = margins.top; }
-            
-            doc.setFillColor(240, 240, 245);
-            doc.rect(margins.left, currentY - 5, pageWidth - 30, 8, 'F');
-            doc.setTextColor(49, 39, 130);
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(11);
-            doc.text("VI. VALIDACIÓN Y FIRMAS", margins.left + 2, currentY);
-            currentY += 15;
-
-            const sigBody = window.signatures.map(s => [
-                s.role + ":\n\n_______________________\n" + s.name + "\n" + s.cargo
-            ]);
-            
-            // Disposición horizontal de firmas (hasta 3 por fila)
-            let sigRow = [];
-            window.signatures.forEach((s) => {
-                sigRow.push(s.role + "\n\n\n__________________________\n" + s.name + "\n" + s.cargo);
-            });
-            
-            doc.autoTable({
-                startY: currentY,
-                head: [],
-                body: [sigRow],
-                theme: 'plain',
-                styles: { halign: 'center', valign: 'bottom', fontSize: 9, cellPadding: 2 },
-                margin: { left: margins.left }
-            });
-
-            // --- NUMERACIÓN FINAL ---
-            const totalPages = doc.internal.getNumberOfPages();
-            for (let i = 1; i <= totalPages; i++) {
-                doc.setPage(i);
-                drawHeader(doc); // Redibujar header en todas por si acaso (capas)
-                drawFooter(doc, i, totalPages);
+            } else {
+                doc.setFont("helvetica", "italic");
+                doc.setFontSize(9);
+                doc.setTextColor(150);
+                doc.text("No se ha guardado configuración individual por libro en la Sección VII.", margins.left, currentY);
+                currentY += 20;
             }
 
-            doc.save(`Informe_Tarifas_Completo_${consecutive}.pdf`);
+            // --- SECCIÓN CONCLUSIONES ---
+            if (currentY > pageHeight - 80) { doc.addPage(); drawHeader(doc); currentY = margins.top; }
+            doc.setFillColor(240, 240, 245); doc.rect(margins.left, currentY - 5, pageWidth - 30, 8, 'F');
+            doc.setTextColor(49, 39, 130); doc.setFont("helvetica", "bold"); doc.setFontSize(11);
+            doc.text("CONCLUSIONES DEL MODELO", margins.left + 2, currentY); currentY += 10;
+            doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(20);
+            const conclusions = [ `1. SOSTENIBILIDAD FINANCIERA: La estructura de costos definida incorpora un margen de recuperación indirecta del ${totalInd}%, distribuido en mano de obra, logística y administración.`, "", `2. EFICIENCIA PARETO Y FLUJO DE CAJA: El análisis evidencia que la gestión de inventarios debe focalizarse estrictamente en los productos Tipo A.`, "", `3. IMPACTO TARIFARIO Y REGULACIÓN: La caracterización de bienes permite discriminar entre productos regulados y de mercado libre.` ];
+            doc.text(conclusions, margins.left, currentY, { maxWidth: pageWidth - 30, align: "justify" }); currentY += 50;
+
+            // --- SECCIÓN VI: FIRMAS (AL FINAL DEL PDF COMO SOLICITADO) ---
+            if (currentY > pageHeight - 40) { doc.addPage(); drawHeader(doc); currentY = margins.top; }
+            doc.setFillColor(240, 240, 245); doc.rect(margins.left, currentY - 5, pageWidth - 30, 8, 'F');
+            doc.setTextColor(49, 39, 130); doc.setFont("helvetica", "bold"); doc.setFontSize(11);
+            doc.text("VI. VALIDACIÓN Y FIRMAS", margins.left + 2, currentY); currentY += 15;
+            let sigRow = []; window.signatures.forEach((s) => { sigRow.push(s.role + "\n\n\n__________________________\n" + s.name + "\n" + s.cargo); });
+            doc.autoTable({ startY: currentY, head: [], body: [sigRow], theme: 'plain', styles: { halign: 'center', valign: 'bottom', fontSize: 9, cellPadding: 2 }, margin: { left: margins.left } });
+
+            const totalPages = doc.internal.getNumberOfPages(); for (let i = 1; i <= totalPages; i++) { doc.setPage(i); drawHeader(doc); drawFooter(doc, i, totalPages); }
+            doc.save(`Informe_Tarifas_Consolidado_${consecutive}.pdf`);
         };
         
-        // --- FIN LOGICA PDF ---
+        // --- HELPERS (DEBEN ESTAR AL FINAL) ---
+        window.applyCategoryFilter = function(category, btnElement) {
+            currentCategoryFilter = category;
+            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active', 'scale-105', 'opacity-100'));
+            if (btnElement) { btnElement.classList.add('active', 'scale-105', 'opacity-100'); } else { const targetBtn = Array.from(document.querySelectorAll('.filter-btn')).find(b => b.textContent.includes(category)); if(targetBtn) targetBtn.classList.add('active', 'scale-105', 'opacity-100'); }
+            const currentBook = document.getElementById('char-book-select').value;
+            if(currentBook) window.renderCharacterizationTable(currentBook);
+        }
+
+        window.renderCharacterizationTable = function(sheetName) {
+            const thead = document.getElementById('char-table-head');
+            const tbody = document.getElementById('char-table-body');
+            tbody.innerHTML = ''; thead.innerHTML = '';
+            const select = document.getElementById('char-book-select');
+            if(select.value !== sheetName && sheetName) select.value = sheetName;
+            let rawData = [];
+            if (sheetName === 'all') { Object.values(window.sheetsData).forEach(arr => { rawData = rawData.concat(arr); }); } else { if (!sheetName || !window.sheetsData[sheetName]) { tbody.innerHTML = '<tr><td colspan="100%" class="px-4 py-8 text-center text-slate-400">Seleccione un libro válido para la caracterización.</td></tr>'; return; } rawData = window.sheetsData[sheetName]; }
+            if (rawData.length === 0) { tbody.innerHTML = '<tr><td colspan="100%" class="px-4 py-8 text-center text-slate-400">No hay datos para visualizar.</td></tr>'; return; }
+            const incrementPercent = parseFloat(document.getElementById('increment-percent').value) || 0;
+            const totalIndirectPercent = window.costStructure.reduce((sum, item) => sum + item.percent, 0);
+            const firstRow = rawData[0];
+            const originalHeaders = Object.keys(firstRow);
+            let headerHTML = '<tr>';
+            originalHeaders.forEach(h => { headerHTML += `<th class="px-4 py-3 whitespace-nowrap">${h}</th>`; });
+            headerHTML += '<th class="px-4 py-3 text-right bg-blue-50 border-l border-blue-200">Costos Indirectos</th>';
+            headerHTML += '<th class="px-4 py-3 text-right bg-blue-50">Costo Total</th>';
+            headerHTML += '<th class="px-4 py-3 text-right bg-blue-50">Costo 2026 (Proy)</th>';
+            headerHTML += '<th class="px-4 py-3 text-right bg-blue-900 text-white font-bold border-l border-blue-700">Tarifa Venta 2026</th>';
+            headerHTML += '<th class="px-4 py-3 text-right bg-green-50 border-l border-green-200 font-bold text-green-800">Var. Absoluta ($)</th>';
+            headerHTML += '<th class="px-4 py-3 text-right bg-green-50 font-bold text-green-800">Var. Relativa (%)</th>';
+            headerHTML += '<th class="px-4 py-3 text-center font-bold bg-blue-900 text-white">CATEGORIZACIÓN</th>';
+            headerHTML += '</tr>';
+            thead.innerHTML = headerHTML;
+            let categoryCounts = { 'BLACK': 0, 'ELITE': 0, 'PLATINO': 0, 'ORO': 0, 'PLATA': 0, 'CLÁSICOS': 0, 'REGULADOS': 0, 'PRODUCTOS SIN FRECUENCIA DE USO': 0 };
+            let processedData = rawData.map(row => {
+                const desc = getColumnVal(row, ['descripción', 'descripcion']);
+                const valCompra = cleanCurrency(getColumnVal(row, ['valor máximo', 'valor maximo', 'ultimas vigencias'])); 
+                const precio2025 = cleanCurrency(getColumnVal(row, ['precio 2025'])); 
+                const pareto = (getColumnVal(row, ['pareto', 'páreto']) || 'N/A').toUpperCase().trim();
+                const identA = (getColumnVal(row, ['identificación', 'identificacion', 'a+']) || '').toUpperCase();
+                const costosIndirectos = valCompra * (totalIndirectPercent / 100);
+                const costoTotal = valCompra + costosIndirectos;
+                const costo2026 = costoTotal * (1 + (incrementPercent / 100));
+                let category = "SIN FRECUENCIA";
+                let badgeClass = "bg-slate-100 text-slate-500";
+                let tarifaVenta2026 = 0;
+                if (pareto === 'A' && identA === 'SI') { category = "BLACK"; badgeClass = "bg-cat-black"; }
+                else if (pareto === 'A') { category = "ELITE"; badgeClass = "bg-cat-elite"; }
+                else if (pareto === 'B') { category = "ORO"; badgeClass = "bg-cat-oro"; }
+                else if (pareto === 'C') { category = "PLATA"; badgeClass = "bg-cat-plata"; }
+                else if (valCompra === 0) { category = "PRODUCTOS SIN FRECUENCIA DE USO"; badgeClass = "bg-cat-sinfreq"; }
+                else { category = "CLÁSICOS"; badgeClass = "bg-cat-clasicos"; }
+                if (desc && desc.toLowerCase().includes('regulado')) { category = "REGULADOS"; badgeClass = "bg-cat-regulados"; }
+                if (category === "REGULADOS") { tarifaVenta2026 = precio2025; } else { tarifaVenta2026 = precio2025 * (1 + (incrementPercent / 100)); }
+                const variacionAbsoluta = tarifaVenta2026 - precio2025;
+                const variacionRelativa = precio2025 !== 0 ? (variacionAbsoluta / precio2025) * 100 : 0;
+                if (categoryCounts.hasOwnProperty(category)) { categoryCounts[category]++; } else { categoryCounts[category] = 1; }
+                return { ...row, _costosIndirectos: costosIndirectos, _costoTotal: costoTotal, _costo2026: costo2026, _tarifaVenta2026: tarifaVenta2026, _variacionAbsoluta: variacionAbsoluta, _variacionRelativa: variacionRelativa, _category: category, _badgeClass: badgeClass };
+            });
+            currentExportData = processedData;
+            window.renderFilterButtons(categoryCounts, processedData.length);
+            window.updateCharacterizationChartsData(categoryCounts);
+            if (currentCategoryFilter !== 'ALL') { processedData = processedData.filter(d => d._category === currentCategoryFilter); }
+            const displayData = processedData.slice(0, 500);
+            const html = displayData.map(d => {
+                let rowHTML = '<tr class="hover:bg-slate-50 transition-colors border-b border-slate-100">';
+                originalHeaders.forEach(h => { let val = d[h]; if (typeof val === 'number' && val > 1000) val = formatMoney(val); rowHTML += `<td class="px-4 py-2 truncate max-w-xs text-xs border-r border-slate-50" title="${val}">${val}</td>`; });
+                rowHTML += `<td class="px-4 py-2 text-right text-xs bg-blue-50 text-slate-600">${formatMoney(d._costosIndirectos)}</td>`;
+                rowHTML += `<td class="px-4 py-2 text-right text-xs bg-blue-50 text-slate-700 font-semibold">${formatMoney(d._costoTotal)}</td>`;
+                rowHTML += `<td class="px-4 py-2 text-right text-xs bg-blue-50 text-slate-800 font-bold">${formatMoney(d._costo2026)}</td>`;
+                rowHTML += `<td class="px-4 py-2 text-right font-extrabold text-white bg-blue-800 text-xs shadow-inner border-l-2 border-white">${formatMoney(d._tarifaVenta2026)}</td>`;
+                rowHTML += `<td class="px-4 py-2 text-right text-xs bg-green-50 text-green-700 font-bold border-l border-green-100">${formatMoney(d._variacionAbsoluta)}</td>`;
+                rowHTML += `<td class="px-4 py-2 text-right text-xs bg-green-50 text-green-700 font-bold">${d._variacionRelativa.toFixed(2)}%</td>`;
+                rowHTML += `<td class="px-4 py-2 text-center"><span class="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${d._badgeClass}">${d._category}</span></td>`;
+                rowHTML += '</tr>';
+                return rowHTML;
+            }).join('');
+            tbody.innerHTML = html || '<tr><td colspan="100%" class="px-4 py-8 text-center text-slate-400">No hay productos en esta categoría.</td></tr>';
+        }
+
+        window.downloadCharacterizationExcel = function() {
+            if (!currentExportData || currentExportData.length === 0) { alert("No hay datos para exportar. Cargue un archivo primero."); return; }
+            const exportArray = currentExportData.map(d => {
+                const newRow = {};
+                Object.keys(d).forEach(key => { if (!key.startsWith('_')) newRow[key] = d[key]; });
+                newRow['Costos Indirectos'] = d._costosIndirectos;
+                newRow['Costo Total'] = d._costoTotal;
+                newRow['Costo Proyectado 2026'] = d._costo2026;
+                newRow['Tarifa Venta 2026'] = d._tarifaVenta2026;
+                newRow['Variación Absoluta 25-26 ($)'] = d._variacionAbsoluta;
+                newRow['Variación Relativa 25-26 (%)'] = d._variacionRelativa / 100; 
+                newRow['Categoría Final'] = d._category;
+                return newRow;
+            });
+            const ws = XLSX.utils.json_to_sheet(exportArray);
+            const wb = XLSX.utils.book_new();
+            const sheetNameSafe = (document.getElementById('char-book-select').value || "Datos").substring(0, 30);
+            XLSX.utils.book_append_sheet(wb, ws, sheetNameSafe);
+            XLSX.writeFile(wb, `Caracterizacion_${sheetNameSafe}_2026.xlsx`);
+        }
+
+        window.renderFilterButtons = function(counts, total) {
+            const container = document.getElementById('category-filters');
+            const filters = [
+                { id: 'ALL', label: `TODOS (${total})`, class: 'bg-slate-600 text-white' },
+                { id: 'BLACK', label: `BLACK (${counts['BLACK']})`, class: 'bg-cat-black' },
+                { id: 'ELITE', label: `ELITE (${counts['ELITE']})`, class: 'bg-cat-elite' },
+                { id: 'PLATINO', label: `PLATINO (${counts['PLATINO']})`, class: 'bg-cat-platino' },
+                { id: 'ORO', label: `ORO (${counts['ORO']})`, class: 'bg-cat-oro' },
+                { id: 'PLATA', label: `PLATA (${counts['PLATA']})`, class: 'bg-cat-plata' },
+                { id: 'CLÁSICOS', label: `CLÁSICOS (${counts['CLÁSICOS']})`, class: 'bg-cat-clasicos' },
+                { id: 'REGULADOS', label: `REGULADOS (${counts['REGULADOS']})`, class: 'bg-cat-regulados' },
+                { id: 'PRODUCTOS SIN FRECUENCIA DE USO', label: `SIN FREQ. (${counts['PRODUCTOS SIN FRECUENCIA DE USO']})`, class: 'bg-cat-sinfreq' }
+            ];
+            container.innerHTML = filters.map(f => `
+                <button class="filter-btn text-[10px] px-2 py-1 rounded-full uppercase ${f.class} ${currentCategoryFilter === f.id ? 'active scale-105 opacity-100' : ''}" 
+                    onclick="window.applyCategoryFilter('${f.id}', this)">${f.label}
+                </button>
+            `).join('');
+        }
+
+        window.updateCharacterizationChartsData = function(counts) {
+            const order = ['BLACK', 'ELITE', 'PLATINO', 'ORO', 'PLATA', 'CLÁSICOS', 'REGULADOS', 'PRODUCTOS SIN FRECUENCIA DE USO'];
+            const labels = order.filter(k => counts[k] > 0);
+            const data = labels.map(k => counts[k]);
+            const colorMap = { 'BLACK': '#000000', 'ELITE': '#4b0082', 'PLATINO': '#e5e4e2', 'ORO': '#ffd700', 'PLATA': '#c0c0c0', 'CLÁSICOS': '#3b82f6', 'REGULADOS': '#10b981', 'PRODUCTOS SIN FRECUENCIA DE USO': '#ef4444' };
+            const colors = labels.map(l => colorMap[l] || '#888');
+            if(characterizationChart) { characterizationChart.data = { labels: labels, datasets: [{ data: data, backgroundColor: colors, borderWidth: 1 }] }; characterizationChart.update(); }
+            if(characterizationBarChart) { characterizationBarChart.data = { labels: labels, datasets: [{ data: data, backgroundColor: colors, borderWidth: 1, borderRadius: 4 }] }; characterizationBarChart.update(); }
+        }
+
+        window.searchInventory = function() {
+            const sheetName = document.getElementById('inventory-book-select').value;
+            const query = document.getElementById('inventory-search-input').value;
+            if(!sheetName) { alert("Seleccione un libro primero."); return; }
+            window.renderInventoryTable(sheetName, query, currentParetoFilter);
+        }
+        window.clearInventorySearch = function() {
+            document.getElementById('inventory-search-input').value = "";
+            const sheetName = document.getElementById('inventory-book-select').value;
+            currentParetoFilter = 'ALL'; 
+            window.renderInventoryTable(sheetName, "");
+        }
+        window.populateSelectors = function() {
+            const paretoSelect = document.getElementById('pareto-book-select');
+            const invSelect = document.getElementById('inventory-book-select');
+            const charSelect = document.getElementById('char-book-select'); 
+            const currPareto = paretoSelect.value;
+            const currInv = invSelect.value;
+            const currChar = charSelect.value;
+            let opts = '<option value="">Seleccione...</option>';
+            let paretoOpts = '<option value="all">CONSOLIDADO GENERAL</option>';
+            window.productGroups.forEach(g => { opts += `<option value="${g.name}">${g.name}</option>`; paretoOpts += `<option value="${g.name}">${g.name}</option>`; });
+            invSelect.innerHTML = opts; paretoSelect.innerHTML = paretoOpts; charSelect.innerHTML = paretoOpts; 
+            if(window.productGroups.length > 0) { if(!currInv) invSelect.value = window.productGroups[0].name; if(!currChar) charSelect.value = window.productGroups[0].name; }
+            if(currInv) invSelect.value = currInv; if(currPareto) paretoSelect.value = currPareto; if(currChar) charSelect.value = currChar;
+            if(invSelect.value) window.renderInventoryTable(invSelect.value);
+            if(charSelect.value && window.sheetsData[charSelect.value]) window.renderCharacterizationTable(charSelect.value);
+        }
+    </script>
+</body>
+</html>
