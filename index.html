@@ -75,8 +75,6 @@
 
         function setupRealtimeListener() {
             if (unsubscribeSnapshot) unsubscribeSnapshot();
-            // CORRECCIÓN DE ERROR FIREBASE: Ruta con 6 segmentos (PAR)
-            // artifacts(1)/appId(2)/public(3)/data(4)/tariff_model_dashboard(5)/main_document(6)
             const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'tariff_model_dashboard', 'main_document');
             unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
                 if (docSnap.exists()) {
@@ -84,14 +82,13 @@
                     if(data.productGroups && data.productGroups.length > 0) window.productGroups = data.productGroups;
                     if(data.costStructure) window.costStructure = data.costStructure;
                     if(data.signatures) window.signatures = data.signatures;
-                    if(data.finalizedAnalysis) window.finalizedAnalysis = data.finalizedAnalysis; // Recuperar análisis
+                    if(data.finalizedAnalysis) window.finalizedAnalysis = data.finalizedAnalysis; 
                     
                     if (!window.isProcessingFile && typeof window.refreshUI === 'function') window.refreshUI(); 
                 }
             });
         };
 
-        // Función global para guardar (expuesta al window)
         window.saveDataToFirebase = async () => {
             if (!user || !db) return; 
             const statusIndicator = document.getElementById('db-status');
@@ -102,12 +99,11 @@
                     productGroups: window.productGroups,
                     costStructure: window.costStructure,
                     signatures: window.signatures,
-                    finalizedAnalysis: window.finalizedAnalysis, // Guardar análisis
+                    finalizedAnalysis: window.finalizedAnalysis, 
                     lastUpdated: new Date().toISOString(),
                     updatedBy: user.uid
                 };
 
-                // CORRECCIÓN DE ERROR FIREBASE: Ruta con 6 segmentos
                 const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'tariff_model_dashboard', 'main_document');
                 await setDoc(docRef, aggregatedData, { merge: true });
 
@@ -213,204 +209,104 @@
             color: #94a3b8;
         }
 
-        /* Estilos para el botón flotante y el modal */
         .fab-btn {
-            position: fixed;
-            bottom: 2rem;
-            right: 2rem;
-            width: 3.5rem;
-            height: 3.5rem;
-            background-color: #008041; /* Verde Institucional */
-            color: white;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-            cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            z-index: 50;
-            font-size: 1.5rem;
+            position: fixed; bottom: 2rem; right: 2rem; width: 3.5rem; height: 3.5rem;
+            background-color: #008041; color: white; border-radius: 50%; display: flex;
+            align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            cursor: pointer; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 50; font-size: 1.5rem;
         }
-        .fab-btn:hover {
-            transform: scale(1.1) rotate(15deg);
-            background-color: #006030;
-        }
+        .fab-btn:hover { transform: scale(1.1) rotate(15deg); background-color: #006030; }
         .modal-backdrop {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(4px);
-            z-index: 60;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.3s ease;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px); z-index: 60;
+            display: flex; align-items: center; justify-content: center; opacity: 0;
+            pointer-events: none; transition: opacity 0.3s ease;
         }
-        .modal-backdrop.active {
-            opacity: 1;
-            pointer-events: auto;
-        }
+        .modal-backdrop.active { opacity: 1; pointer-events: auto; }
         .modal-content {
-            background-color: white;
-            width: 95%;
-            max-width: 800px;
-            max-height: 85vh;
-            border-radius: 1rem;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-            transform: scale(0.95);
-            transition: transform 0.3s ease;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
+            background-color: white; width: 95%; max-width: 800px; max-height: 85vh;
+            border-radius: 1rem; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            transform: scale(0.95); transition: transform 0.3s ease; display: flex; flex-direction: column; overflow: hidden;
         }
-        .modal-backdrop.active .modal-content {
-            transform: scale(1);
-        }
-        .modal-scroll {
-            overflow-y: auto;
-            padding: 1.5rem;
-            flex-grow: 1;
-        }
+        .modal-backdrop.active .modal-content { transform: scale(1); }
+        .modal-scroll { overflow-y: auto; padding: 1.5rem; flex-grow: 1; }
         .step-number {
-            background-color: #008041;
-            color: white;
-            width: 1.8rem;
-            height: 1.8rem;
-            border-radius: 50%;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            font-size: 0.9rem;
-            margin-right: 0.5rem;
-            flex-shrink: 0;
+            background-color: #008041; color: white; width: 1.8rem; height: 1.8rem;
+            border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+            font-weight: bold; font-size: 0.9rem; margin-right: 0.5rem; flex-shrink: 0;
+        }
+        
+        .increment-card {
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.5rem;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+        }
+        .increment-label {
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: #64748b;
+            margin-bottom: 0.25rem;
+            display: block;
         }
     </style>
 </head>
 <body class="p-4 md:p-8 text-slate-800 flex flex-col min-h-screen">
 
-    <!-- BOTÓN FLOTANTE DE AYUDA -->
     <button class="fab-btn group" onclick="window.toggleHelpModal()" title="Manual de Usuario">
         <i class="fas fa-question"></i>
-        <span class="absolute right-full mr-3 bg-slate-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-            Ver Tutorial
-        </span>
+        <span class="absolute right-full mr-3 bg-slate-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">Ver Tutorial</span>
     </button>
 
-    <!-- MODAL DE AYUDA / TUTORIAL -->
     <div id="help-modal" class="modal-backdrop">
         <div class="modal-content">
             <div class="bg-principal text-white p-4 flex justify-between items-center shrink-0">
                 <h2 class="text-xl font-bold"><i class="fas fa-book-reader mr-2"></i>Manual de Uso - Modelo Tarifario</h2>
                 <button onclick="window.toggleHelpModal()" class="text-white hover:text-yellow-400 text-2xl leading-none">&times;</button>
             </div>
-            
             <div class="modal-scroll space-y-6">
-                <!-- Introducción -->
                 <div class="bg-blue-50 p-4 rounded-lg border border-blue-100 text-sm text-slate-700">
-                    <p class="mb-2"><strong>Bienvenido al sistema de parametrización de tarifas.</strong> Este aplicativo permite cargar datos maestros, analizar el comportamiento de costos (Pareto), clasificar el portafolio (Matriz Estratégica) y definir las tarifas finales para la vigencia 2026 de manera ágil y auditada.</p>
+                    <p class="mb-2"><strong>Bienvenido.</strong> Este aplicativo permite cargar datos maestros, analizar el comportamiento de costos, clasificar el portafolio y definir tarifas 2026.</p>
                 </div>
-
-                <!-- Paso 1 -->
                 <div>
-                    <h3 class="flex items-center text-lg font-bold text-slate-800 mb-2">
-                        <span class="step-number">1</span> Carga de Datos Iniciales
-                    </h3>
+                    <h3 class="flex items-center text-lg font-bold text-slate-800 mb-2"><span class="step-number">1</span> Carga de Datos Iniciales</h3>
                     <ul class="list-disc list-inside text-sm text-slate-600 ml-2 space-y-1">
-                        <li><strong>Logo Institucional (Opcional):</strong> Haga clic en el recuadro superior izquierdo para cargar un logo personalizado para los reportes PDF.</li>
-                        <li><strong>Archivo Maestro (Obligatorio):</strong> En la <em>Sección I</em>, haga clic en el botón de "Cargar Archivo Maestro". El sistema acepta archivos Excel (.xlsx) con múltiples hojas. Cada hoja se interpretará como un "Libro" de productos.</li>
+                        <li><strong>Archivo Maestro:</strong> En la <em>Sección I</em>, cargue su Excel (.xlsx). Cada hoja se interpreta como un "Libro" (Medicamentos, Dispositivos, etc.).</li>
                     </ul>
                 </div>
-
-                <!-- Paso 2 -->
                 <div>
-                    <h3 class="flex items-center text-lg font-bold text-slate-800 mb-2">
-                        <span class="step-number">2</span> Análisis de la Información
-                    </h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-slate-600 ml-2">
-                        <div class="bg-slate-50 p-3 rounded border">
-                            <strong class="text-principal">Sección II: Pareto</strong>
-                            <p class="mt-1">Visualice la distribución 80/20 de sus costos. Haga clic en las barras del gráfico para filtrar automáticamente la tabla de detalle.</p>
-                        </div>
-                        <div class="bg-slate-50 p-3 rounded border">
-                            <strong class="text-principal">Sección V: Caracterización</strong>
-                            <p class="mt-1">El sistema clasifica automáticamente los ítems (BLACK, ELITE, ORO...) combinando Pareto e Identificación Estratégica.</p>
-                        </div>
-                    </div>
+                    <h3 class="flex items-center text-lg font-bold text-slate-800 mb-2"><span class="step-number">2</span> Análisis de la Información</h3>
+                    <p class="text-sm text-slate-600 ml-2">Visualice Pareto (Sección II) y la Caracterización Global (Sección V).</p>
                 </div>
-
-                <!-- Paso 3 -->
-                <div>
-                    <h3 class="flex items-center text-lg font-bold text-slate-800 mb-2">
-                        <span class="step-number">3</span> Algoritmo de Precios (Automático)
-                    </h3>
-                    <p class="text-sm text-slate-600 ml-2 mb-2 text-justify">
-                        El sistema selecciona automáticamente el precio base de compra siguiendo una lógica estricta para garantizar la recuperación de costos:
-                    </p>
-                    <div class="bg-yellow-50 p-3 rounded border border-yellow-200 text-xs text-slate-700 ml-2">
-                        <ol class="list-decimal list-inside space-y-1">
-                            <li><strong>Prioridad 1:</strong> Busca en la columna <em>"VALOR MÁXIMO DE COMPRA (ULTIMAS VIGENCIAS)"</em>.</li>
-                            <li><strong>Prioridad 2:</strong> Si no hay dato, toma <em>"COSTO MÁXIMO DE COMPRA VIGENCIA 2025"</em>.</li>
-                            <li><strong>Regulados:</strong> Aplica reglas especiales de tope según circular 019 de 2024.</li>
-                        </ol>
-                    </div>
-                </div>
-
-                <!-- Paso 4 -->
-                <div>
-                    <h3 class="flex items-center text-lg font-bold text-slate-800 mb-2">
-                        <span class="step-number">4</span> Definición de Tarifas (Sección VII)
-                    </h3>
-                    <p class="text-sm text-slate-600 ml-2 mb-2">Esta es la sección operativa más importante. Aquí definirá el incremento final por libro:</p>
-                    <ul class="list-disc list-inside text-sm text-slate-600 ml-2 space-y-2">
-                        <li><strong>Filtros de Auditoría:</strong> Use el selector "Ver:" para filtrar <em>"⚠️ Con Observaciones"</em>. Esto mostrará solo los ítems donde el Margen proyectado sea negativo.</li>
-                        <li><strong>Ajuste de Incremento:</strong> Modifique el porcentaje en la casilla "Incremento 2026". El sistema recalculará tarifas y márgenes en tiempo real.</li>
-                        <li><strong>Guardar:</strong> Es OBLIGATORIO hacer clic en el botón azul <strong>"Guardar"</strong> en cada libro para que la configuración se incluya en el reporte final.</li>
+                 <div>
+                    <h3 class="flex items-center text-lg font-bold text-slate-800 mb-2"><span class="step-number">3</span> Definición de Tarifas (Sección VII)</h3>
+                    <p class="text-sm text-slate-600 ml-2 mb-2">Aquí se gestiona cada libro por separado. Use el gráfico de torta para ver la distribución y la tabla para el detalle.</p>
+                     <ul class="list-disc list-inside text-sm text-slate-600 ml-2 space-y-2">
+                        <li><strong>Incrementos por Categoría:</strong> Ajuste el % de incremento para cada grupo (Black, Elite, Clásicos, etc.) de forma independiente.</li>
+                        <li><strong>Gráfica Interactiva:</strong> A la izquierda de cada tabla, verá la distribución por categoría.</li>
+                        <li><strong>Filtros:</strong> Use el selector "Ver:" para filtrar ítems con observaciones.</li>
+                        <li><strong>Guardar:</strong> Es OBLIGATORIO hacer clic en <strong>"Guardar"</strong> para incluir la configuración en el PDF.</li>
                     </ul>
-                </div>
-
-                <!-- Paso 5 -->
-                <div>
-                    <h3 class="flex items-center text-lg font-bold text-slate-800 mb-2">
-                        <span class="step-number">5</span> Generación de Entregables
-                    </h3>
-                    <div class="flex flex-wrap gap-2 ml-2">
-                        <span class="px-2 py-1 bg-green-100 text-green-800 text-xs font-bold rounded border border-green-200"><i class="fas fa-file-excel mr-1"></i> Excel Detallado</span>
-                        <span class="px-2 py-1 bg-red-100 text-red-800 text-xs font-bold rounded border border-red-200"><i class="fas fa-file-pdf mr-1"></i> Informe PDF</span>
-                    </div>
-                    <p class="text-sm text-slate-600 ml-2 mt-2">
-                        Use el botón <strong>"Informe Completo"</strong> en la cabecera para generar el PDF oficial con firmas, resumen gerencial y estructura de costos. Use los botones de Excel en las secciones V y VII para descargar las sábanas de datos.
-                    </p>
                 </div>
             </div>
-
             <div class="p-4 border-t bg-slate-50 flex justify-end shrink-0">
-                <button onclick="window.toggleHelpModal()" class="bg-principal hover:bg-blue-900 text-white px-6 py-2 rounded-lg font-bold text-sm transition-colors">
-                    Entendido, ir a la aplicación
-                </button>
+                <button onclick="window.toggleHelpModal()" class="bg-principal hover:bg-blue-900 text-white px-6 py-2 rounded-lg font-bold text-sm transition-colors">Entendido</button>
             </div>
         </div>
     </div>
 
     <div class="max-w-7xl mx-auto space-y-6 flex-grow">
-        
         <!-- ENCABEZADO -->
         <header class="bg-principal text-white p-6 rounded-xl shadow-lg flex flex-col md:flex-row justify-between items-center gap-4 relative overflow-hidden">
             <div class="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-16 -mt-16 pointer-events-none"></div>
-            
             <div class="flex items-center gap-4 z-10 w-full md:w-auto">
                  <div class="logo-upload-area group" onclick="document.getElementById('Logo_HUHMP_Blanco_Input').click()" title="Clic para cargar el archivo local">
                     <img id="Logo_HUHMP_Blanco_Preview" src="" alt="Logo Blanco" class="h-12 w-auto object-contain drop-shadow-md mb-1">
                     <span class="text-[0.65rem] text-yellow-400 font-bold text-center block leading-tight mt-1"><i class="fas fa-upload mr-1"></i>Cargar archivo:<br>Logo_HUHMP_Blanco</span>
                     <input type="file" id="Logo_HUHMP_Blanco_Input" accept="image/png, image/jpeg, image/svg+xml" class="hidden" onchange="window.updateSpecificLogo(this)">
                 </div>
-
                 <div class="flex-grow border-l border-blue-800 pl-4 ml-2">
                     <h1 class="text-2xl md:text-3xl font-bold leading-tight">Modelo de Tarifas Farmacéuticas</h1>
                     <p class="text-blue-200 text-sm md:text-base">ESE Hospital Universitario Hernando Moncaleano Perdomo</p>
@@ -420,7 +316,6 @@
                     </div>
                 </div>
             </div>
-
             <div class="flex flex-col gap-2 z-10 flex-shrink-0">
                 <button onclick="window.resetApp()" class="bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded-lg shadow-md transition-colors flex items-center justify-center font-semibold text-xs ring-1 ring-slate-500 w-full" title="Borrar datos y reiniciar">
                     <i class="fas fa-undo mr-2"></i> Restablecer
@@ -432,309 +327,96 @@
         </header>
 
         <main class="grid grid-cols-1 gap-8">
-
-            <!-- SECCIÓN I: Resumen -->
+            <!-- SECCIONES I, II, III (Sin cambios visuales) -->
             <section id="section-resumen" class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b pb-4 gap-4">
-                    <div>
-                        <h2 class="text-xl font-bold text-slate-700">I. Resumen de Productos por Tipo</h2>
-                        <p class="text-sm text-slate-500">Seleccione un libro para ver su detalle</p>
-                    </div>
-                    
+                    <div><h2 class="text-xl font-bold text-slate-700">I. Resumen de Productos por Tipo</h2></div>
                     <div class="data-upload-zone p-3 flex items-center gap-3 cursor-pointer group shadow-sm" onclick="document.getElementById('pharmacy-file-upload').click()">
-                        <div class="bg-principal text-white w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 group-hover:bg-blue-800 transition-colors">
-                            <i class="fas fa-file-excel"></i>
-                        </div>
-                        <div class="text-left">
-                            <p class="text-sm font-bold text-slate-700">Cargar Archivo Maestro</p>
-                            <p class="text-xs text-slate-500" id="upload-status-text">Excel Multilibro (.xlsx, .xlsm)</p>
-                        </div>
+                        <div class="bg-principal text-white w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 group-hover:bg-blue-800 transition-colors"><i class="fas fa-file-excel"></i></div>
+                        <div class="text-left"><p class="text-sm font-bold text-slate-700">Cargar Archivo Maestro</p><p class="text-xs text-slate-500" id="upload-status-text">Excel Multilibro (.xlsx, .xlsm)</p></div>
                         <input type="file" id="pharmacy-file-upload" accept=".csv, .xlsx, .xls, .xlsm" class="hidden" onchange="window.handlePharmacyFileUpload(event)">
                     </div>
                 </div>
-
-                <div id="book-buttons-container" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 mb-6">
-                    <div class="col-span-full text-center py-8 text-slate-400 bg-slate-50 rounded border border-dashed border-slate-300">
-                        <i class="fas fa-arrow-up mb-2"></i><br>Cargue un archivo Excel para visualizar los libros disponibles.
-                    </div>
-                </div>
-
+                <div id="book-buttons-container" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 mb-6"></div>
                 <div id="book-detail-panel" class="detail-panel hidden p-6 rounded-lg shadow-inner">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 id="detail-title" class="text-lg font-bold text-principal">Detalle del Libro</h3>
-                        <span id="detail-items-badge" class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded">0 Ítems</span>
-                    </div>
+                    <div class="flex justify-between items-center mb-4"><h3 id="detail-title" class="text-lg font-bold text-principal">Detalle del Libro</h3><span id="detail-items-badge" class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded">0 Ítems</span></div>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div class="bg-white p-4 rounded border border-slate-100 shadow-sm">
-                            <p class="text-xs text-slate-500 uppercase font-bold mb-1">Costo Total Inventario</p>
-                            <p id="detail-cost" class="text-xl font-bold text-slate-700">$ 0</p>
-                        </div>
-                        <div class="bg-white p-4 rounded border border-slate-100 shadow-sm">
-                            <p class="text-xs text-slate-500 uppercase font-bold mb-1">Valor Venta Proyectado</p>
-                            <p id="detail-revenue" class="text-xl font-bold text-secundario">$ 0</p>
-                        </div>
-                        <div class="bg-white p-4 rounded border border-slate-100 shadow-sm">
-                            <p class="text-xs text-slate-500 uppercase font-bold mb-1">Variación $ (Venta - Costo)</p>
-                            <p id="detail-variation" class="text-xl font-bold text-terciario">$ 0</p>
-                        </div>
+                        <div class="bg-white p-4 rounded border border-slate-100 shadow-sm"><p class="text-xs text-slate-500 uppercase font-bold mb-1">Costo Total Inventario</p><p id="detail-cost" class="text-xl font-bold text-slate-700">$ 0</p></div>
+                        <div class="bg-white p-4 rounded border border-slate-100 shadow-sm"><p class="text-xs text-slate-500 uppercase font-bold mb-1">Valor Venta Proyectado</p><p id="detail-revenue" class="text-xl font-bold text-secundario">$ 0</p></div>
+                        <div class="bg-white p-4 rounded border border-slate-100 shadow-sm"><p class="text-xs text-slate-500 uppercase font-bold mb-1">Variación $ (Venta - Costo)</p><p id="detail-variation" class="text-xl font-bold text-terciario">$ 0</p></div>
                     </div>
                 </div>
             </section>
 
-            <!-- SECCIÓN II: Pareto -->
             <section id="section-graficos" class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                 <div class="flex flex-col sm:flex-row justify-between items-center mb-6 border-b pb-4 gap-4">
-                    <div>
-                        <h2 class="text-xl font-bold text-slate-700">II. Análisis de Pareto</h2>
-                        <span class="text-xs text-slate-500">Haga clic en los gráficos para filtrar la tabla de detalle (Sección III)</span>
-                    </div>
-                    <div class="flex items-center gap-2 bg-slate-100 p-2 rounded-lg">
-                        <label for="pareto-book-select" class="text-xs font-bold text-slate-600 uppercase"><i class="fas fa-filter mr-1"></i>Fuente:</label>
-                        <select id="pareto-book-select" onchange="window.updateParetoBySheet(this.value)" class="text-sm border-none bg-transparent focus:ring-0 text-principal font-bold cursor-pointer outline-none">
-                            <option value="all">Consolidado General</option>
-                        </select>
-                    </div>
+                    <div><h2 class="text-xl font-bold text-slate-700">II. Análisis de Pareto</h2></div>
+                    <div class="flex items-center gap-2 bg-slate-100 p-2 rounded-lg"><label for="pareto-book-select" class="text-xs font-bold text-slate-600 uppercase"><i class="fas fa-filter mr-1"></i>Fuente:</label><select id="pareto-book-select" onchange="window.updateParetoBySheet(this.value)" class="text-sm border-none bg-transparent focus:ring-0 text-principal font-bold cursor-pointer outline-none"><option value="all">Consolidado General</option></select></div>
                 </div>
-
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-6">
-                    <div class="bg-slate-50 p-4 rounded-lg border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-                        <h3 class="text-sm font-semibold text-center mb-2 text-slate-600">Conteo por Clasificación (Filas)</h3>
-                        <div class="relative h-64"><canvas id="paretoChart"></canvas></div>
-                    </div>
-                    <div class="bg-slate-50 p-4 rounded-lg border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-                        <div class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-2">
-                            <h3 class="text-sm font-semibold text-slate-600">Distribución %</h3>
-                        </div>
-                        <div class="relative h-64 flex justify-center"><canvas id="paretoPieChart"></canvas></div>
-                    </div>
+                    <div class="bg-slate-50 p-4 rounded-lg border border-slate-100 shadow-sm hover:shadow-md transition-shadow"><h3 class="text-sm font-semibold text-center mb-2 text-slate-600">Conteo por Clasificación (Filas)</h3><div class="relative h-64"><canvas id="paretoChart"></canvas></div></div>
+                    <div class="bg-slate-50 p-4 rounded-lg border border-slate-100 shadow-sm hover:shadow-md transition-shadow"><div class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-2"><h3 class="text-sm font-semibold text-slate-600">Distribución %</h3></div><div class="relative h-64 flex justify-center"><canvas id="paretoPieChart"></canvas></div></div>
                 </div>
-
-                <!-- Explicación de Pareto (Texto Actualizado) -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                    <div class="info-card border-l-red-500">
-                        <h4 class="font-bold text-slate-800 mb-1">Tipo A (Vitales)</h4>
-                        <p class="text-slate-600 text-xs text-justify">Representan aproximadamente el <strong>80% del valor total</strong> del inventario pero solo el 20% de los ítems. Son productos de alto costo o alta rotación que requieren control estricto.</p>
-                    </div>
-                    <div class="info-card border-l-yellow-400">
-                        <h4 class="font-bold text-slate-800 mb-1">Tipo B (Esenciales)</h4>
-                        <p class="text-slate-600 text-xs text-justify">Representan cerca del <strong>15% del valor</strong> y el 30% de los ítems. Tienen una importancia media y requieren controles moderados.</p>
-                    </div>
-                    <div class="info-card border-l-blue-400">
-                        <h4 class="font-bold text-slate-800 mb-1">Tipo C (No Esenciales)</h4>
-                        <p class="text-slate-600 text-xs text-justify">Representan solo el <strong>5% del valor</strong> pero constituyen el 50% de los ítems. Son productos de bajo costo con controles más flexibles.</p>
-                    </div>
-                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm"><div class="info-card border-l-red-500"><h4 class="font-bold text-slate-800 mb-1">Tipo A (Vitales)</h4><p class="text-slate-600 text-xs text-justify">Representan aproximadamente el <strong>80% del valor total</strong> del inventario.</p></div><div class="info-card border-l-yellow-400"><h4 class="font-bold text-slate-800 mb-1">Tipo B (Esenciales)</h4><p class="text-slate-600 text-xs text-justify">Representan cerca del <strong>15% del valor</strong>.</p></div><div class="info-card border-l-blue-400"><h4 class="font-bold text-slate-800 mb-1">Tipo C (No Esenciales)</h4><p class="text-slate-600 text-xs text-justify">Representan solo el <strong>5% del valor</strong>.</p></div></div>
             </section>
 
-            <!-- SECCIÓN III: Detalle de Ítems -->
             <section id="section-detalle-items" class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                 <div class="flex flex-col lg:flex-row justify-between items-center mb-4 border-b pb-4 gap-4">
-                    <div>
-                        <h2 class="text-xl font-bold text-slate-700">III. Detalle de Ítems Farmacéuticos</h2>
-                        <p class="text-sm text-slate-500">Visualización detallada por libro cargado</p>
-                    </div>
-                    
+                    <div><h2 class="text-xl font-bold text-slate-700">III. Detalle de Ítems Farmacéuticos</h2></div>
                     <div class="flex flex-col sm:flex-row gap-3 items-center">
-                        <div class="flex items-center gap-2 bg-white border border-slate-300 p-1.5 rounded-lg shadow-sm focus-within:ring-2 focus-within:ring-blue-500 transition-all">
-                             <i class="fas fa-search text-slate-400 pl-2"></i>
-                             <input id="inventory-search-input" type="text" placeholder="Buscar por nombre o código..." 
-                                    class="text-xs border-none focus:ring-0 text-slate-700 w-48 outline-none"
-                                    onkeyup="if(event.key === 'Enter') window.searchInventory()">
-                             <button onclick="window.searchInventory()" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-1 rounded text-xs font-bold transition">
-                                Buscar
-                             </button>
-                             <button onclick="window.clearInventorySearch()" class="text-slate-400 hover:text-red-500 px-1 ml-1" title="Limpiar filtro">
-                                <i class="fas fa-times"></i>
-                             </button>
-                        </div>
-
-                        <div class="flex items-center gap-2 bg-slate-100 p-2 rounded-lg border border-slate-200">
-                            <label for="inventory-book-select" class="text-xs font-bold text-slate-600 uppercase"><i class="fas fa-book mr-1"></i>Libro:</label>
-                            <select id="inventory-book-select" onchange="window.renderInventoryTable(this.value)" class="text-sm border-none bg-transparent focus:ring-0 text-principal font-bold cursor-pointer outline-none">
-                                <option value="">Seleccione...</option>
-                            </select>
-                        </div>
+                        <div class="flex items-center gap-2 bg-white border border-slate-300 p-1.5 rounded-lg shadow-sm focus-within:ring-2 focus-within:ring-blue-500 transition-all"><i class="fas fa-search text-slate-400 pl-2"></i><input id="inventory-search-input" type="text" placeholder="Buscar por nombre o código..." class="text-xs border-none focus:ring-0 text-slate-700 w-48 outline-none" onkeyup="if(event.key === 'Enter') window.searchInventory()"><button onclick="window.searchInventory()" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-1 rounded text-xs font-bold transition">Buscar</button><button onclick="window.clearInventorySearch()" class="text-slate-400 hover:text-red-500 px-1 ml-1" title="Limpiar filtro"><i class="fas fa-times"></i></button></div>
+                        <div class="flex items-center gap-2 bg-slate-100 p-2 rounded-lg border border-slate-200"><label for="inventory-book-select" class="text-xs font-bold text-slate-600 uppercase"><i class="fas fa-book mr-1"></i>Libro:</label><select id="inventory-book-select" onchange="window.renderInventoryTable(this.value)" class="text-sm border-none bg-transparent focus:ring-0 text-principal font-bold cursor-pointer outline-none"><option value="">Seleccione...</option></select></div>
                     </div>
                 </div>
-
-                <div class="inventory-table-container">
-                    <table class="w-full text-xs text-left inventory-table">
-                        <thead class="text-xs uppercase bg-principal text-white">
-                            <tr>
-                                <th class="px-4 py-3">Cód. Producto</th>
-                                <th class="px-4 py-3">Descripción</th>
-                                <th class="px-4 py-3">Presentación</th>
-                                <th class="px-4 py-3 text-right">Precio 2025</th>
-                                <th class="px-4 py-3 text-right">Unidades</th>
-                                <th class="px-4 py-3 text-right">Valor Compra (Calc)</th>
-                                <th class="px-4 py-3">Estado</th>
-                                <th class="px-4 py-3">Observaciones</th>
-                                <th class="px-4 py-3">Homologación</th>
-                                <th class="px-4 py-3 text-center">Pareto</th>
-                                <th class="px-4 py-3 text-center">Ident. A+</th>
-                            </tr>
-                        </thead>
-                        <tbody id="inventory-table-body" class="divide-y divide-slate-100 bg-white">
-                            <tr>
-                                <td colspan="11" class="px-4 py-8 text-center text-slate-400">
-                                    Cargue un archivo y seleccione un libro para ver los datos.
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+                <div class="inventory-table-container"><table class="w-full text-xs text-left inventory-table"><thead class="text-xs uppercase bg-principal text-white"><tr><th class="px-4 py-3">Cód. Producto</th><th class="px-4 py-3">Descripción</th><th class="px-4 py-3">Presentación</th><th class="px-4 py-3 text-right">Precio 2025</th><th class="px-4 py-3 text-right">Unidades</th><th class="px-4 py-3 text-right">Valor Compra (Máx)</th><th class="px-4 py-3">Estado</th><th class="px-4 py-3">Observaciones</th><th class="px-4 py-3">Homologación</th><th class="px-4 py-3 text-center">Pareto</th><th class="px-4 py-3 text-center">Ident. A+</th></tr></thead><tbody id="inventory-table-body" class="divide-y divide-slate-100 bg-white"><tr><td colspan="11" class="px-4 py-8 text-center text-slate-400">Cargue un archivo y seleccione un libro para ver los datos.</td></tr></tbody></table></div>
             </section>
 
-            <!-- SECCIÓN IV: Costos Indirectos -->
             <section id="section-costos" class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                <div class="flex flex-col lg:flex-row justify-between items-center mb-4 border-b pb-2 gap-4">
-                    <h2 class="text-xl font-bold text-slate-700">IV. Estructura de Costos Indirectos</h2>
-                </div>
-
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm text-left">
-                        <thead class="text-xs text-white uppercase bg-principal">
-                            <tr>
-                                <th class="px-4 py-3 rounded-tl-lg">Rubro</th>
-                                <th class="px-4 py-3 text-right rounded-tr-lg">Porcentaje (%)</th>
-                            </tr>
-                        </thead>
-                        <tbody id="cost-structure-body" class="divide-y divide-slate-100"></tbody>
-                        <tfoot class="bg-slate-50 font-bold text-slate-700">
-                            <tr>
-                                <td class="px-4 py-3">TOTAL COSTO INDIRECTO</td>
-                                <td class="px-4 py-3 text-right text-terciario" id="total-indirect-percent">0.00%</td>
-                            </tr>
-                        </tfoot>
-                    </table>
-                </div>
+                <div class="flex flex-col lg:flex-row justify-between items-center mb-4 border-b pb-2 gap-4"><h2 class="text-xl font-bold text-slate-700">IV. Estructura de Costos Indirectos</h2></div>
+                <div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead class="text-xs text-white uppercase bg-principal"><tr><th class="px-4 py-3 rounded-tl-lg">Rubro</th><th class="px-4 py-3 text-right rounded-tr-lg">Porcentaje (%)</th></tr></thead><tbody id="cost-structure-body" class="divide-y divide-slate-100"></tbody><tfoot class="bg-slate-50 font-bold text-slate-700"><tr><td class="px-4 py-3">TOTAL COSTO INDIRECTO</td><td class="px-4 py-3 text-right text-terciario" id="total-indirect-percent">0.00%</td></tr></tfoot></table></div>
             </section>
 
-            <!-- SECCIÓN V: Caracterización de Bienes -->
             <section id="section-caracterizacion" class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                 <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 border-b pb-4 gap-4">
-                    <div>
-                        <h2 class="text-xl font-bold text-slate-700">V. Caracterización de Bienes</h2>
-                        <p class="text-sm text-slate-500">Clasificación dinámica. Haga clic en las gráficas para filtrar.</p>
-                    </div>
-                    
+                    <div><h2 class="text-xl font-bold text-slate-700">V. Caracterización de Bienes</h2></div>
                     <div class="flex flex-col gap-3 items-end">
                         <div class="flex gap-2">
-                             <div class="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200 w-full sm:w-auto">
-                                <label for="increment-percent" class="text-xs font-bold text-slate-600 uppercase">Incremento 2026 (%):</label>
-                                <input type="number" id="increment-percent" value="10" class="table-input w-16 text-right font-bold text-principal" onchange="window.renderCharacterizationTable(document.getElementById('char-book-select').value)">
-                            </div>
-    
-                            <div class="flex items-center gap-2 bg-slate-100 p-2 rounded-lg border border-slate-200 w-full sm:w-auto">
-                                <label for="char-book-select" class="text-xs font-bold text-slate-600 uppercase"><i class="fas fa-book mr-1"></i>Libro:</label>
-                                <select id="char-book-select" onchange="window.renderCharacterizationTable(this.value)" class="text-sm border-none bg-transparent focus:ring-0 text-principal font-bold cursor-pointer outline-none">
-                                    <option value="">Seleccione...</option>
-                                </select>
-                            </div>
+                             <div class="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200 w-full sm:w-auto"><label for="increment-percent" class="text-xs font-bold text-slate-600 uppercase">Incremento 2026 (%):</label><input type="number" id="increment-percent" value="10" class="table-input w-16 text-right font-bold text-principal" onchange="window.renderCharacterizationTable(document.getElementById('char-book-select').value)"></div>
+                            <div class="flex items-center gap-2 bg-slate-100 p-2 rounded-lg border border-slate-200 w-full sm:w-auto"><label for="char-book-select" class="text-xs font-bold text-slate-600 uppercase"><i class="fas fa-book mr-1"></i>Libro:</label><select id="char-book-select" onchange="window.renderCharacterizationTable(this.value)" class="text-sm border-none bg-transparent focus:ring-0 text-principal font-bold cursor-pointer outline-none"><option value="">Seleccione...</option></select></div>
                         </div>
-                        
-                        <!-- BOTÓN DESCARGA EXCEL -->
-                        <button onclick="window.downloadCharacterizationExcel()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow-sm text-xs font-bold flex items-center gap-2 transition-colors">
-                            <i class="fas fa-file-excel"></i> Descargar Excel Completo
-                        </button>
+                        <button onclick="window.downloadCharacterizationExcel()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow-sm text-xs font-bold flex items-center gap-2 transition-colors"><i class="fas fa-file-excel"></i> Descargar Excel Completo</button>
                     </div>
                 </div>
-
-                <!-- FILTROS DE CATEGORÍA -->
                 <div class="flex flex-wrap gap-2 mb-4 justify-center" id="category-filters"></div>
-
-                <!-- GRÁFICAS DE CARACTERIZACIÓN -->
                 <div class="border-b pb-6 mb-6">
                     <h3 class="text-sm font-bold text-slate-700 mb-4 text-center">Distribución Estratégica del Portafolio (Interactiva)</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div class="relative h-64 w-full">
-                            <h4 class="text-center text-xs font-bold mb-2 text-slate-500">Distribución % (Clic para filtrar)</h4>
-                            <canvas id="characterizationChart"></canvas> <!-- Gráfica de Dona -->
-                        </div>
-                        <div class="relative h-64 w-full">
-                             <h4 class="text-center text-xs font-bold mb-2 text-slate-500">Cantidad por Categoría (Clic para filtrar)</h4>
-                            <canvas id="characterizationBarChart"></canvas> <!-- Nueva Gráfica de Barras -->
-                        </div>
+                        <div class="relative h-64 w-full"><h4 class="text-center text-xs font-bold mb-2 text-slate-500">Distribución % (Clic para filtrar)</h4><canvas id="characterizationChart"></canvas></div>
+                        <div class="relative h-64 w-full"><h4 class="text-center text-xs font-bold mb-2 text-slate-500">Cantidad por Categoría (Clic para filtrar)</h4><canvas id="characterizationBarChart"></canvas></div>
                     </div>
                 </div>
-
-                <div class="inventory-table-container mb-8">
-                    <table class="w-full text-xs text-left inventory-table">
-                        <thead class="text-xs uppercase bg-principal text-white" id="char-table-head">
-                            <!-- Columnas dinámicas aquí -->
-                        </thead>
-                        <tbody id="char-table-body" class="divide-y divide-slate-100 bg-white">
-                            <tr>
-                                <td class="px-4 py-8 text-center text-slate-400">
-                                    Cargue un archivo y seleccione un libro para ver la caracterización.
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                
-                <!-- Explicación de Categorías -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs mt-4">
-                     <div class="info-card border-l-black">
-                        <h4 class="font-bold text-black mb-1">BLACK (A + Estratégico)</h4>
-                        <p class="text-slate-600">Máxima prioridad. Productos Pareto A con Identificación estratégica (A+).</p>
-                    </div>
-                    <div class="info-card border-l-indigo-800">
-                        <h4 class="font-bold text-indigo-900 mb-1">ELITE (A)</h4>
-                        <p class="text-slate-600">Productos Pareto A estándar. Alto impacto en costo y rotación.</p>
-                    </div>
-                    <div class="info-card border-l-yellow-400">
-                        <h4 class="font-bold text-yellow-700 mb-1">ORO (B)</h4>
-                        <p class="text-slate-600">Productos Pareto B. Impacto medio en el presupuesto.</p>
-                    </div>
-                    <div class="info-card border-l-gray-400">
-                        <h4 class="font-bold text-gray-700 mb-1">PLATA (C)</h4>
-                        <p class="text-slate-600">Productos Pareto C. Bajo impacto financiero.</p>
-                    </div>
-                    <div class="info-card border-l-blue-500">
-                        <h4 class="font-bold text-blue-700 mb-1">CLÁSICOS</h4>
-                        <p class="text-slate-600">Ítems estándar que no clasifican en la matriz principal de Pareto.</p>
-                    </div>
-                    <div class="info-card border-l-green-500">
-                        <h4 class="font-bold text-green-700 mb-1">REGULADOS</h4>
-                        <p class="text-slate-600">Productos con precios controlados por la CNPMDM. Tarifa fija.</p>
-                    </div>
-                </div>
+                <div class="inventory-table-container mb-8"><table class="w-full text-xs text-left inventory-table"><thead class="text-xs uppercase bg-principal text-white" id="char-table-head"></thead><tbody id="char-table-body" class="divide-y divide-slate-100 bg-white"><tr><td class="px-4 py-8 text-center text-slate-400">Cargue un archivo y seleccione un libro para ver la caracterización.</td></tr></tbody></table></div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs mt-4"><div class="info-card border-l-black"><h4 class="font-bold text-black mb-1">BLACK (A + Estratégico)</h4><p class="text-slate-600">Máxima prioridad.</p></div><div class="info-card border-l-indigo-800"><h4 class="font-bold text-indigo-900 mb-1">ELITE (A)</h4><p class="text-slate-600">Productos Pareto A estándar.</p></div><div class="info-card border-l-yellow-400"><h4 class="font-bold text-yellow-700 mb-1">ORO (B)</h4><p class="text-slate-600">Productos Pareto B.</p></div><div class="info-card border-l-gray-400"><h4 class="font-bold text-gray-700 mb-1">PLATA (C)</h4><p class="text-slate-600">Productos Pareto C.</p></div><div class="info-card border-l-blue-500"><h4 class="font-bold text-blue-700 mb-1">CLÁSICOS</h4><p class="text-slate-600">Ítems estándar.</p></div><div class="info-card border-l-green-500"><h4 class="font-bold text-green-700 mb-1">REGULADOS</h4><p class="text-slate-600">Productos con precios controlados por la CNPMDM.</p></div></div>
             </section>
 
-             <!-- SECCIÓN VI: Firmas -->
-            <section id="section-firmas" class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                <div class="flex justify-between items-center mb-4 border-b pb-2">
-                    <h2 class="text-xl font-bold text-slate-700">VI. Firmas</h2>
-                    <button onclick="window.addSignature()" class="text-xs bg-principal text-white px-3 py-1 rounded hover:bg-blue-800"><i class="fas fa-plus"></i></button>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm text-left">
-                        <tbody id="signatures-body" class="divide-y divide-slate-100"></tbody>
-                    </table>
-                </div>
+             <section id="section-firmas" class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <div class="flex justify-between items-center mb-4 border-b pb-2"><h2 class="text-xl font-bold text-slate-700">VI. Firmas</h2><button onclick="window.addSignature()" class="text-xs bg-principal text-white px-3 py-1 rounded hover:bg-blue-800"><i class="fas fa-plus"></i></button></div>
+                <div class="overflow-x-auto"><table class="w-full text-sm text-left"><tbody id="signatures-body" class="divide-y divide-slate-100"></tbody></table></div>
             </section>
             
             <div class="section-separator"></div>
 
-            <!-- SECCIÓN VII: Análisis de Tarifas por Libro (NUEVA) -->
+            <!-- SECCIÓN VII: Análisis de Tarifas por Libro (NUEVA - CON GRÁFICOS) -->
             <section id="section-analisis-tarifas" class="bg-slate-50 p-6 rounded-xl shadow-inner border border-slate-300">
                 <div class="mb-6">
                     <h2 class="text-xl font-bold text-slate-800 mb-2">VII. Análisis de Tarifas por Libro (Detallado)</h2>
-                    <p class="text-sm text-slate-600">Defina el incremento individual y guarde la configuración para el informe final consolidado.</p>
+                    <p class="text-sm text-slate-600">Defina el incremento individual por categoría y guarde la configuración para el informe final consolidado.</p>
                 </div>
-                
-                <div id="rate-analysis-container" class="space-y-8">
-                    <div class="text-center py-10 text-slate-400">
-                        <i class="fas fa-layer-group text-3xl mb-2"></i>
-                        <p>Cargue un archivo para visualizar las tablas de análisis individual.</p>
-                    </div>
-                </div>
+                <div id="rate-analysis-container" class="space-y-8"><div class="text-center py-10 text-slate-400"><i class="fas fa-layer-group text-3xl mb-2"></i><p>Cargue un archivo para visualizar las tablas de análisis individual.</p></div></div>
             </section>
 
         </main>
         
-        <!-- FOOTER -->
         <footer class="text-center py-6 text-xs text-slate-500 mt-8 border-t border-slate-200">
             <p class="font-bold text-slate-600">© 2025 ESE HUHMP - Hospital Universitario Hernando Moncaleano Perdomo</p>
             <p>Documento controlado. Cualquier impresión es copia no controlada.</p>
@@ -748,6 +430,8 @@
         window.productGroups = [];
         window.currentBaseCost = 0; 
         window.finalizedAnalysis = {}; 
+        // NUEVO: Almacén de instancias de gráficos para Sección VII
+        window.sheetCharts = {};
 
         let Logo_HUHMP_Blanco = ""; 
         let currentPieMode = 'count';
@@ -780,19 +464,11 @@
             window.initCharts();
             window.initCharacterizationCharts(); 
             window.refreshUI();
-            
-            // Abrir ayuda automáticamente si es la primera vez (opcional, comentado)
-            // setTimeout(() => window.toggleHelpModal(), 1000); 
         };
 
-        // --- FUNCIÓN PARA EL MODAL DE AYUDA ---
         window.toggleHelpModal = function() {
             const modal = document.getElementById('help-modal');
-            if (modal.classList.contains('active')) {
-                modal.classList.remove('active');
-            } else {
-                modal.classList.add('active');
-            }
+            if (modal.classList.contains('active')) { modal.classList.remove('active'); } else { modal.classList.add('active'); }
         }
 
         window.refreshUI = function() {
@@ -811,6 +487,8 @@
             window.productGroups = [];
             window.currentBaseCost = 0;
             window.finalizedAnalysis = {}; 
+            // Resetear graficos de libros
+            window.sheetCharts = {};
             currentCategoryFilter = 'ALL';
             currentParetoFilter = 'ALL';
             
@@ -820,7 +498,6 @@
             
             if(paretoChart) { paretoChart.data.labels = []; paretoChart.data.datasets[0].data = []; paretoChart.update(); }
             if(pieChart) { pieChart.data.labels = []; pieChart.data.datasets[0].data = []; pieChart.update(); }
-            
             if(characterizationChart) { characterizationChart.data.labels=[]; characterizationChart.data.datasets[0].data=[]; characterizationChart.update(); }
             if(characterizationBarChart) { characterizationBarChart.data.labels=[]; characterizationBarChart.data.datasets[0].data=[]; characterizationBarChart.update(); }
             document.getElementById('category-filters').innerHTML = ''; 
@@ -836,105 +513,114 @@
         // --- NUEVA LÓGICA DE PRECIOS CENTRALIZADA ---
         window.determinePurchasePrice = function(row, sheetName) {
             if (!sheetName) return 0;
-            
-            // Helper para obtener valor numérico
             const getVal = (keywords) => cleanCurrency(getColumnVal(row, keywords));
-            
-            // Términos de búsqueda universales basados en las instrucciones
-            // "VALOR MÁXIMO DE COMPRA (ULTIMAS VIGENCIAS)" (Col R, N, M según libro)
             const termMaxUltimas = ['valor máximo de compra', 'valor maximo de compra', 'ultimas vigencias'];
-            
-            // "COSTO MÁXIMO DE COMPRA VIGENCIA 2025 (CORTE 23 NOV 2025)" (Col Q, M, N según libro)
             const termCosto2025 = ['costo máximo de compra', 'costo maximo de compra', 'vigencia 2025', 'corte 23 nov'];
-
-            // Lógica Unificada para todos los libros:
-            // 1. Intentar obtener el "VALOR MÁXIMO DE COMPRA (ULTIMAS VIGENCIAS)"
             let valPrimary = getVal(termMaxUltimas);
-            
-            // 2. Si no tiene valor (0, null, undefined), tomar el "COSTO MÁXIMO DE COMPRA VIGENCIA 2025"
-            // Esta lógica cumple con: "sino tiene valor se tomaría el de la columna..."
-            // Y cumple con la restricción de regulados (priorizar últimas vigencias permitidas o la específica 2025)
-            if (valPrimary <= 0) {
-                return getVal(termCosto2025);
-            }
-            
+            if (valPrimary <= 0) { return getVal(termCosto2025); }
             return valPrimary;
         }
 
-        // --- FUNCIONES SECCIÓN VII (NUEVAS) ---
+        // --- FUNCIONES SECCIÓN VII (NUEVAS + GRÁFICAS) ---
         window.renderRateAnalysisSection = function() {
             const container = document.getElementById('rate-analysis-container');
             if (!window.sheetsData || Object.keys(window.sheetsData).length === 0) {
-                container.innerHTML = `
-                    <div class="text-center py-10 text-slate-400">
-                        <i class="fas fa-layer-group text-3xl mb-2"></i>
-                        <p>Cargue un archivo para visualizar las tablas de análisis individual.</p>
-                    </div>`;
+                container.innerHTML = `<div class="text-center py-10 text-slate-400"><i class="fas fa-layer-group text-3xl mb-2"></i><p>Cargue un archivo para visualizar las tablas de análisis individual.</p></div>`;
                 return;
             }
 
             container.innerHTML = '';
             
-            // Iterar por cada libro cargado
             Object.keys(window.sheetsData).forEach((sheetName) => {
-                // Generar ID seguro
                 const safeId = sheetName.replace(/[^a-zA-Z0-9]/g, '_');
                 
+                // Generar Inputs para cada categoría
+                const inputsHtml = `
+                    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 mb-4 bg-slate-50 p-2 rounded border border-slate-200">
+                         <div>
+                            <label class="increment-label">Black</label>
+                            <input type="number" id="inc-black-${safeId}" value="10" class="table-input text-right" onchange="window.updateSheetTable('${sheetName.replace(/'/g, "\\'")}', '${safeId}')">
+                        </div>
+                        <div>
+                            <label class="increment-label">Elite</label>
+                            <input type="number" id="inc-elite-${safeId}" value="10" class="table-input text-right" onchange="window.updateSheetTable('${sheetName.replace(/'/g, "\\'")}', '${safeId}')">
+                        </div>
+                        <div>
+                            <label class="increment-label">Oro</label>
+                            <input type="number" id="inc-oro-${safeId}" value="10" class="table-input text-right" onchange="window.updateSheetTable('${sheetName.replace(/'/g, "\\'")}', '${safeId}')">
+                        </div>
+                        <div>
+                            <label class="increment-label">Plata</label>
+                            <input type="number" id="inc-plata-${safeId}" value="10" class="table-input text-right" onchange="window.updateSheetTable('${sheetName.replace(/'/g, "\\'")}', '${safeId}')">
+                        </div>
+                        <div>
+                            <label class="increment-label">Clásicos</label>
+                            <input type="number" id="inc-clasicos-${safeId}" value="10" class="table-input text-right" onchange="window.updateSheetTable('${sheetName.replace(/'/g, "\\'")}', '${safeId}')">
+                        </div>
+                        <div>
+                            <label class="increment-label">Regulados</label>
+                            <input type="number" id="inc-regulados-${safeId}" value="0" class="table-input text-right" title="Solo aplica si no hay precio fijo 2026" onchange="window.updateSheetTable('${sheetName.replace(/'/g, "\\'")}', '${safeId}')">
+                        </div>
+                         <div>
+                            <label class="increment-label">Sin Freq</label>
+                            <input type="number" id="inc-sinfreq-${safeId}" value="0" class="table-input text-right" onchange="window.updateSheetTable('${sheetName.replace(/'/g, "\\'")}', '${safeId}')">
+                        </div>
+                    </div>
+                `;
+
+                // --- CAMBIO: ESTRUCTURA GRID PARA GRÁFICA (IZQ) Y TABLA (DER) ---
                 const html = `
                     <div class="bg-white p-4 rounded-lg shadow border border-slate-200" id="analysis-block-${safeId}">
                         <div class="flex flex-col sm:flex-row justify-between items-center mb-4 border-b pb-2 gap-4">
                             <h3 class="font-bold text-principal text-lg"><i class="fas fa-book mr-2"></i>${sheetName}</h3>
-                            
                             <div class="flex flex-wrap items-center gap-4 bg-slate-50 p-2 rounded-lg">
-                                <!-- NUEVO: SELECTOR DE FILTRO -->
                                 <div class="flex items-center gap-2 border-r border-slate-300 pr-4 mr-2">
                                     <label class="text-xs font-bold text-slate-600 uppercase"><i class="fas fa-filter mr-1"></i>Ver:</label>
-                                    <select id="filter-${safeId}" 
-                                            class="table-input w-36 text-xs font-bold text-principal border-blue-300 focus:border-blue-500"
-                                            onchange="window.updateSheetTable('${sheetName.replace(/'/g, "\\'")}', '${safeId}')">
+                                    <select id="filter-${safeId}" class="table-input w-36 text-xs font-bold text-principal border-blue-300 focus:border-blue-500" onchange="window.updateSheetTable('${sheetName.replace(/'/g, "\\'")}', '${safeId}')">
                                         <option value="ALL">Ver Todos</option>
                                         <option value="WITH_OBS">⚠️ Con Observaciones</option>
                                         <option value="WITHOUT_OBS">✅ Sin Observaciones</option>
                                     </select>
                                 </div>
-
-                                <div class="flex items-center gap-2">
-                                    <label class="text-xs font-bold text-slate-600 uppercase">Incremento 2026 (%):</label>
-                                    <input type="number" id="increment-${safeId}" value="10" 
-                                           class="table-input w-20 text-right font-bold text-principal border-blue-300 focus:border-blue-500"
-                                           onchange="window.updateSheetTable('${sheetName.replace(/'/g, "\\'")}', '${safeId}')">
-                                </div>
-                                <button onclick="window.saveSheetAnalysis('${sheetName.replace(/'/g, "\\'")}', '${safeId}')" 
-                                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow text-xs font-bold flex items-center gap-2 transition-transform active:scale-95">
-                                    <i class="fas fa-save"></i> Guardar
-                                </button>
-                                <!-- BOTÓN DE DESCARGA EXCEL PARA SECCIÓN VII -->
-                                <button onclick="window.downloadSheetAnalysisExcel('${sheetName.replace(/'/g, "\\'")}')" 
-                                        class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow text-xs font-bold flex items-center gap-2 transition-transform active:scale-95">
-                                    <i class="fas fa-file-excel"></i> Excel
-                                </button>
+                                <button onclick="window.saveSheetAnalysis('${sheetName.replace(/'/g, "\\'")}', '${safeId}')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow text-xs font-bold flex items-center gap-2 transition-transform active:scale-95"><i class="fas fa-save"></i> Guardar</button>
+                                <button onclick="window.downloadSheetAnalysisExcel('${sheetName.replace(/'/g, "\\'")}')" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow text-xs font-bold flex items-center gap-2 transition-transform active:scale-95"><i class="fas fa-file-excel"></i> Descargar Libro</button>
                                 <span id="status-${safeId}" class="text-xs font-bold text-slate-400 italic">Sin guardar</span>
                             </div>
                         </div>
+                        
+                        <h4 class="text-xs font-bold text-slate-500 uppercase mb-2">Configurar Incrementos por Categoría (%):</h4>
+                        ${inputsHtml}
 
-                        <div class="inventory-table-container max-h-[300px]">
-                            <table class="w-full text-xs text-left inventory-table">
-                                <thead class="text-xs uppercase bg-slate-700 text-white sticky top-0">
-                                    <tr>
-                                        <th class="px-4 py-2">Cód</th>
-                                        <th class="px-4 py-2">Descripción</th>
-                                        <th class="px-4 py-2 text-right">Costo Total</th>
-                                        <th class="px-4 py-2 text-right">Tarifa 2026</th>
-                                        <th class="px-4 py-2 text-right bg-blue-50 font-bold border-l border-blue-200">Margen ($)</th>
-                                        <th class="px-4 py-2 text-right">Var %</th>
-                                        <th class="px-4 py-2 text-center bg-yellow-100 text-yellow-900 border-l border-yellow-300">Observación</th>
-                                        <th class="px-4 py-2 text-center">Categoría</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="tbody-${safeId}" class="divide-y divide-slate-100">
-                                    <!-- Rows populated by JS -->
-                                </tbody>
-                            </table>
+                        <!-- LAYOUT PARTIDO: 1/3 GRÁFICA | 2/3 TABLA -->
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <!-- COLUMNA IZQUIERDA: GRÁFICA -->
+                            <div class="lg:col-span-1 bg-slate-50 p-4 rounded-lg shadow-inner flex flex-col justify-center items-center border border-slate-200">
+                                <h4 class="text-xs font-bold text-slate-500 uppercase mb-4 text-center">Distribución de Categorías (Visible)</h4>
+                                <div class="relative h-64 w-full">
+                                    <canvas id="chart-${safeId}"></canvas>
+                                </div>
+                            </div>
+
+                            <!-- COLUMNA DERECHA: TABLA -->
+                            <div class="lg:col-span-2 inventory-table-container max-h-[400px]">
+                                <table class="w-full text-xs text-left inventory-table">
+                                    <thead class="text-xs uppercase bg-slate-700 text-white sticky top-0">
+                                        <tr>
+                                            <th class="px-4 py-2">Cód</th>
+                                            <th class="px-4 py-2">Descripción</th>
+                                            <th class="px-4 py-2 text-right">Costo Total</th>
+                                            <th class="px-4 py-2 text-right">Tarifa 2026</th>
+                                            <th class="px-4 py-2 text-right bg-blue-50 font-bold border-l border-blue-200">Margen ($)</th>
+                                            <th class="px-4 py-2 text-right">Var %</th>
+                                            <th class="px-4 py-2 text-center bg-yellow-100 text-yellow-900 border-l border-yellow-300">Observación</th>
+                                            <th class="px-4 py-2 text-center">Categoría</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tbody-${safeId}" class="divide-y divide-slate-100">
+                                        <!-- Rows populated by JS -->
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -947,12 +633,20 @@
         window.updateSheetTable = function(sheetName, safeId) {
             const rawData = window.sheetsData[sheetName];
             const tbody = document.getElementById(`tbody-${safeId}`);
-            const inputInc = document.getElementById(`increment-${safeId}`);
+            
+            // Obtener incrementos individuales
+            const increments = {
+                'BLACK': parseFloat(document.getElementById(`inc-black-${safeId}`)?.value) || 0,
+                'ELITE': parseFloat(document.getElementById(`inc-elite-${safeId}`)?.value) || 0,
+                'ORO': parseFloat(document.getElementById(`inc-oro-${safeId}`)?.value) || 0,
+                'PLATA': parseFloat(document.getElementById(`inc-plata-${safeId}`)?.value) || 0,
+                'CLÁSICOS': parseFloat(document.getElementById(`inc-clasicos-${safeId}`)?.value) || 0,
+                'REGULADOS': parseFloat(document.getElementById(`inc-regulados-${safeId}`)?.value) || 0,
+                'PRODUCTOS SIN FRECUENCIA DE USO': parseFloat(document.getElementById(`inc-sinfreq-${safeId}`)?.value) || 0
+            };
+
             const filterEl = document.getElementById(`filter-${safeId}`);
             const filterVal = filterEl ? filterEl.value : 'ALL';
-
-            if(!inputInc) return;
-            const increment = parseFloat(inputInc.value) || 0;
             const totalIndirect = window.costStructure.reduce((s, i) => s + i.percent, 0);
 
             if (!rawData) { tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-slate-400">Datos no disponibles para este libro.</td></tr>'; return; }
@@ -961,10 +655,7 @@
 
             const processed = rawData.map(row => {
                 const desc = getColumnVal(row, ['descripción', 'descripcion']);
-                
-                // --- CAMBIO PRINCIPAL: USO DE NUEVA LÓGICA DE PRECIOS ---
                 const valCompra = window.determinePurchasePrice(row, sheetName);
-                
                 const precio2025 = cleanCurrency(getColumnVal(row, ['precio 2025'])); 
                 const precio2026 = cleanCurrency(getColumnVal(row, ['precio 2026', 'tarifa 2026', 'valor 2026', 'proyección 2026', 'venta 2026', 'precio regulado', 'valor regulado', 'tope', 'regulado']));
                 
@@ -989,11 +680,15 @@
                     badgeClass = "bg-cat-regulados"; 
                 }
 
+                // Obtener incremento específico para esta categoría
+                const specificIncrement = increments[category] || 0;
+
                 let tarifa26 = 0;
                 if (category === "REGULADOS") {
-                    tarifa26 = (precio2026 > 0) ? Math.round(precio2026) : Math.round(precio2025);
+                    // Lógica para regulados: Si hay precio explícito 2026, úsalo. Si no, usa incremento (si es 0, queda igual)
+                    tarifa26 = (precio2026 > 0) ? Math.round(precio2026) : Math.round(precio2025 * (1 + (specificIncrement / 100)));
                 } else {
-                    tarifa26 = Math.round(precio2025 * (1 + (increment / 100)));
+                    tarifa26 = Math.round(precio2025 * (1 + (specificIncrement / 100)));
                 }
                 
                 const margen = tarifa26 - costoTotal;
@@ -1014,11 +709,29 @@
                 };
             });
             
+            // FILTRADO (Ahora primero filtramos, luego contamos para la gráfica)
             const filtered = processed.filter(r => {
                 if (filterVal === 'WITH_OBS') return r.observacion !== ''; 
                 if (filterVal === 'WITHOUT_OBS') return r.observacion === ''; 
                 return true; 
             });
+
+            // --- OBJETO PARA CONTEO DE CATEGORÍAS (GRÁFICA REACTIVA) ---
+            let categoryCounts = {
+                'BLACK': 0, 'ELITE': 0, 'PLATINO': 0, 'ORO': 0, 'PLATA': 0,
+                'CLÁSICOS': 0, 'REGULADOS': 0, 'PRODUCTOS SIN FRECUENCIA DE USO': 0
+            };
+
+            filtered.forEach(r => {
+                 if (categoryCounts.hasOwnProperty(r.category)) {
+                    categoryCounts[r.category]++;
+                } else {
+                    categoryCounts[r.category] = 1;
+                }
+            });
+
+            // --- ACTUALIZAR GRÁFICA DE TORTA DE ESTE LIBRO (CON DATOS FILTRADOS) ---
+            window.renderSheetPieChart(safeId, categoryCounts);
 
             if (filtered.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-slate-400">No hay ítems que coincidan con el filtro seleccionado.</td></tr>';
@@ -1044,18 +757,70 @@
             }
         }
 
+        // --- NUEVA FUNCIÓN PARA RENDERIZAR GRÁFICO POR LIBRO ---
+        window.renderSheetPieChart = function(safeId, counts) {
+            const ctx = document.getElementById(`chart-${safeId}`);
+            if (!ctx) return;
+
+            // Destruir gráfico anterior si existe para evitar superposiciones
+            if (window.sheetCharts[safeId]) {
+                window.sheetCharts[safeId].destroy();
+            }
+
+            // Datos y colores (mismos que Sección V)
+            const order = ['BLACK', 'ELITE', 'PLATINO', 'ORO', 'PLATA', 'CLÁSICOS', 'REGULADOS', 'PRODUCTOS SIN FRECUENCIA DE USO'];
+            const labels = order.filter(k => counts[k] > 0);
+            const data = labels.map(k => counts[k]);
+            const colorMap = {
+                'BLACK': '#000000', 'ELITE': '#4b0082', 'PLATINO': '#e5e4e2',
+                'ORO': '#ffd700', 'PLATA': '#c0c0c0', 'CLÁSICOS': '#3b82f6',
+                'REGULADOS': '#10b981', 'PRODUCTOS SIN FRECUENCIA DE USO': '#ef4444'
+            };
+            const colors = labels.map(l => colorMap[l] || '#888');
+
+            window.sheetCharts[safeId] = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: colors,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } }
+                    }
+                }
+            });
+        }
+
         window.downloadSheetAnalysisExcel = function(sheetName) {
             const rawData = window.sheetsData[sheetName];
             if (!rawData) { alert(`No hay datos cargados para el libro: ${sheetName}`); return; }
 
+            const safeId = sheetName.replace(/[^a-zA-Z0-9]/g, '_');
             const totalIndirect = window.costStructure.reduce((s, i) => s + i.percent, 0);
-            const increment = parseFloat(document.getElementById(`increment-${sheetName.replace(/[^a-zA-Z0-9]/g, '_')}`).value) || 0;
+            
+            // Recoger incrementos específicos
+            const increments = {
+                'BLACK': parseFloat(document.getElementById(`inc-black-${safeId}`)?.value) || 0,
+                'ELITE': parseFloat(document.getElementById(`inc-elite-${safeId}`)?.value) || 0,
+                'ORO': parseFloat(document.getElementById(`inc-oro-${safeId}`)?.value) || 0,
+                'PLATA': parseFloat(document.getElementById(`inc-plata-${safeId}`)?.value) || 0,
+                'CLÁSICOS': parseFloat(document.getElementById(`inc-clasicos-${safeId}`)?.value) || 0,
+                'REGULADOS': parseFloat(document.getElementById(`inc-regulados-${safeId}`)?.value) || 0,
+                'PRODUCTOS SIN FRECUENCIA DE USO': parseFloat(document.getElementById(`inc-sinfreq-${safeId}`)?.value) || 0
+            };
+
             const isRegulatedSheet = sheetName.toUpperCase().includes('REGULADOS');
 
             const exportArray = rawData.map(row => {
                 const desc = getColumnVal(row, ['descripción', 'descripcion']);
                 
-                // --- CAMBIO PRINCIPAL ---
                 const valCompra = window.determinePurchasePrice(row, sheetName);
                 
                 const precio2025 = cleanCurrency(getColumnVal(row, ['precio 2025'])); 
@@ -1076,11 +841,13 @@
                 const isRegulated = isRegulatedSheet || (desc && desc.toLowerCase().includes('regulado'));
                 if (isRegulated) { category = "REGULADOS"; }
 
+                const specificIncrement = increments[category] || 0;
+
                 let tarifa26 = 0;
                 if (isRegulated) {
-                     tarifa26 = (precio2026_file > 0) ? Math.round(precio2026_file) : Math.round(precio2025);
+                     tarifa26 = (precio2026_file > 0) ? Math.round(precio2026_file) : Math.round(precio2025 * (1 + (specificIncrement / 100)));
                 } else {
-                    tarifa26 = Math.round(precio2025 * (1 + (increment / 100)));
+                    tarifa26 = Math.round(precio2025 * (1 + (specificIncrement / 100)));
                 }
 
                 const margen = tarifa26 - costoTotal;
@@ -1096,6 +863,7 @@
                 newRow['Margen Neto ($)'] = margen;
                 newRow['Variación Relativa 25-26 (%)'] = varRel; 
                 newRow['Categoría Final'] = category;
+                newRow['Incremento Aplicado (%)'] = specificIncrement;
                 newRow['Observación de Margen'] = observacion;
                 
                 return newRow;
@@ -1110,9 +878,17 @@
 
 
         window.saveSheetAnalysis = function(sheetName, safeId) {
-            const inputInc = document.getElementById(`increment-${safeId}`);
-            if(!inputInc) return;
-            const increment = parseFloat(inputInc.value) || 0;
+            // Recoger incrementos específicos
+            const increments = {
+                'BLACK': parseFloat(document.getElementById(`inc-black-${safeId}`)?.value) || 0,
+                'ELITE': parseFloat(document.getElementById(`inc-elite-${safeId}`)?.value) || 0,
+                'ORO': parseFloat(document.getElementById(`inc-oro-${safeId}`)?.value) || 0,
+                'PLATA': parseFloat(document.getElementById(`inc-plata-${safeId}`)?.value) || 0,
+                'CLÁSICOS': parseFloat(document.getElementById(`inc-clasicos-${safeId}`)?.value) || 0,
+                'REGULADOS': parseFloat(document.getElementById(`inc-regulados-${safeId}`)?.value) || 0,
+                'PRODUCTOS SIN FRECUENCIA DE USO': parseFloat(document.getElementById(`inc-sinfreq-${safeId}`)?.value) || 0
+            };
+
             const totalIndirect = window.costStructure.reduce((s, i) => s + i.percent, 0);
             const rawData = window.sheetsData[sheetName];
             
@@ -1123,31 +899,44 @@
             let items = rawData.length;
 
             rawData.forEach(row => {
-                // --- CAMBIO PRINCIPAL ---
                 const valCompra = window.determinePurchasePrice(row, sheetName);
 
                 const precio2025 = cleanCurrency(getColumnVal(row, ['precio 2025'])); 
                 const precio2026 = cleanCurrency(getColumnVal(row, ['precio 2026', 'tarifa 2026', 'valor 2026', 'proyección 2026', 'venta 2026', 'precio regulado', 'valor regulado', 'tope', 'regulado']));
                 const desc = getColumnVal(row, ['descripción', 'descripcion']);
+                
+                const pareto = (getColumnVal(row, ['pareto', 'páreto']) || 'N/A').toUpperCase().trim();
+                const identA = (getColumnVal(row, ['identificación', 'identificacion', 'a+']) || '').toUpperCase();
 
                 const costosIndirectos = valCompra * (totalIndirect / 100);
                 const costoTotal = valCompra + costosIndirectos;
                 
-                let isRegulated = isRegulatedSheet || (desc && desc.toLowerCase().includes('regulado'));
+                let category = "CLÁSICOS";
+                if (pareto === 'A' && identA === 'SI') { category = "BLACK"; }
+                else if (pareto === 'A') { category = "ELITE"; }
+                else if (pareto === 'B') { category = "ORO"; }
+                else if (pareto === 'C') { category = "PLATA"; }
+                else if (valCompra === 0) { category = "PRODUCTOS SIN FRECUENCIA DE USO"; }
                 
+                let isRegulated = isRegulatedSheet || (desc && desc.toLowerCase().includes('regulado'));
+                if (isRegulated) category = "REGULADOS";
+
+                const specificIncrement = increments[category] || 0;
+
                 let tarifa26 = 0;
                 if (isRegulated) {
-                     tarifa26 = (precio2026 > 0) ? Math.round(precio2026) : Math.round(precio2025);
+                     tarifa26 = (precio2026 > 0) ? Math.round(precio2026) : Math.round(precio2025 * (1 + (specificIncrement / 100)));
                 } else {
-                    tarifa26 = Math.round(precio2025 * (1 + (increment / 100)));
+                    tarifa26 = Math.round(precio2025 * (1 + (specificIncrement / 100)));
                 }
 
                 totalCost += costoTotal;
                 totalRevenue26 += tarifa26;
             });
 
+            // Guardar con detalle de incrementos
             window.finalizedAnalysis[sheetName] = {
-                increment,
+                incrementDetail: increments,
                 items,
                 totalCost,
                 totalRevenue26,
@@ -1264,10 +1053,7 @@
                 const pres = getColumnVal(row, ['presentación', 'presentacion']);
                 const precio = cleanCurrency(getColumnVal(row, ['precio 2025']));
                 const unidades = parseFloat(getColumnVal(row, ['unidades', 'n° unidades'])) || 0;
-                
-                // --- CAMBIO PRINCIPAL ---
                 const valCompra = window.determinePurchasePrice(row, sheetName);
-
                 const estado = getColumnVal(row, ['estado']);
                 const obs = getColumnVal(row, ['observaciones', 'obsveraciones']);
                 const hom = getColumnVal(row, ['homologación', 'homologacion']);
@@ -1290,6 +1076,173 @@
                 `;
             }).join('');
             tbody.innerHTML = html;
+        }
+
+        // --- RESTAURACIÓN: FUNCIÓN DE RENDERIZADO DE CARACTERIZACIÓN (SECCIÓN V) ---
+        window.renderCharacterizationTable = function(sheetName) {
+            const tbody = document.getElementById('char-table-body');
+            const thead = document.getElementById('char-table-head');
+            
+            if(!tbody || !thead) return;
+            tbody.innerHTML = '';
+            
+            const select = document.getElementById('char-book-select');
+            if(select && select.value !== sheetName) select.value = sheetName;
+
+            if (!sheetName || !window.sheetsData[sheetName]) {
+                tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-slate-400">Seleccione un libro para ver la caracterización.</td></tr>';
+                return;
+            }
+
+            const increment = parseFloat(document.getElementById('increment-percent').value) || 0;
+            const totalIndirect = window.costStructure.reduce((s, i) => s + i.percent, 0);
+            const rawData = window.sheetsData[sheetName];
+            const isRegulatedSheet = sheetName.toUpperCase().includes('REGULADOS');
+
+            let categoryCounts = {
+                'BLACK': 0, 'ELITE': 0, 'PLATINO': 0, 'ORO': 0, 'PLATA': 0,
+                'CLÁSICOS': 0, 'REGULADOS': 0, 'PRODUCTOS SIN FRECUENCIA DE USO': 0
+            };
+
+            const processed = rawData.map(row => {
+                const desc = getColumnVal(row, ['descripción', 'descripcion']);
+                const valCompra = window.determinePurchasePrice(row, sheetName);
+                const precio2025 = cleanCurrency(getColumnVal(row, ['precio 2025'])); 
+                const precio2026 = cleanCurrency(getColumnVal(row, ['precio 2026', 'tarifa 2026', 'valor 2026', 'proyección 2026', 'venta 2026', 'precio regulado', 'valor regulado', 'tope', 'regulado']));
+                
+                const pareto = (getColumnVal(row, ['pareto', 'páreto']) || 'N/A').toUpperCase().trim();
+                const identA = (getColumnVal(row, ['identificación', 'identificacion', 'a+']) || '').toUpperCase();
+
+                const costosIndirectos = valCompra * (totalIndirect / 100);
+                const costoTotal = valCompra + costosIndirectos;
+                
+                let category = "SIN FRECUENCIA";
+                let badgeClass = "bg-slate-100 text-slate-500";
+                
+                if (pareto === 'A' && identA === 'SI') { category = "BLACK"; badgeClass = "bg-cat-black"; }
+                else if (pareto === 'A') { category = "ELITE"; badgeClass = "bg-cat-elite"; }
+                else if (pareto === 'B') { category = "ORO"; badgeClass = "bg-cat-oro"; }
+                else if (pareto === 'C') { category = "PLATA"; badgeClass = "bg-cat-plata"; }
+                else if (valCompra === 0) { category = "PRODUCTOS SIN FRECUENCIA DE USO"; badgeClass = "bg-cat-sinfreq"; }
+                else { category = "CLÁSICOS"; badgeClass = "bg-cat-clasicos"; }
+                
+                if (isRegulatedSheet || (desc && desc.toLowerCase().includes('regulado'))) { 
+                    category = "REGULADOS"; 
+                    badgeClass = "bg-cat-regulados"; 
+                }
+
+                let tarifa26 = 0;
+                if (category === "REGULADOS") {
+                    tarifa26 = (precio2026 > 0) ? Math.round(precio2026) : Math.round(precio2025);
+                } else {
+                    tarifa26 = Math.round(precio2025 * (1 + (increment / 100)));
+                }
+                
+                const varAbs = tarifa26 - precio2025;
+                const varRel = precio2025 !== 0 ? (varAbs / precio2025) * 100 : 0;
+
+                // Contar para gráficos
+                if (categoryCounts.hasOwnProperty(category)) categoryCounts[category]++;
+                else categoryCounts[category] = 1;
+
+                return {
+                    codigo: getColumnVal(row, ['código', 'codigo']),
+                    desc: desc,
+                    _costoTotal: costoTotal,
+                    _tarifaVenta2026: tarifa26,
+                    _variacionRelativa: varRel,
+                    _category: category,
+                    badgeClass: badgeClass
+                };
+            });
+
+            // Actualizar Gráficos Globales (Sección V)
+            const order = ['BLACK', 'ELITE', 'PLATINO', 'ORO', 'PLATA', 'CLÁSICOS', 'REGULADOS', 'PRODUCTOS SIN FRECUENCIA DE USO'];
+            const labels = order.filter(k => categoryCounts[k] > 0);
+            const data = labels.map(k => categoryCounts[k]);
+            const colorMap = {
+                'BLACK': '#000000', 'ELITE': '#4b0082', 'PLATINO': '#e5e4e2',
+                'ORO': '#ffd700', 'PLATA': '#c0c0c0', 'CLÁSICOS': '#3b82f6',
+                'REGULADOS': '#10b981', 'PRODUCTOS SIN FRECUENCIA DE USO': '#ef4444'
+            };
+            const colors = labels.map(l => colorMap[l] || '#888');
+
+            if(characterizationChart) {
+                characterizationChart.data.labels = labels;
+                characterizationChart.data.datasets[0].data = data;
+                characterizationChart.data.datasets[0].backgroundColor = colors;
+                characterizationChart.update();
+            }
+            if(characterizationBarChart) {
+                characterizationBarChart.data.labels = labels;
+                characterizationBarChart.data.datasets[0].data = data;
+                characterizationBarChart.data.datasets[0].backgroundColor = colors;
+                characterizationBarChart.update();
+            }
+
+            // Filtrado para tabla visual
+            let displayData = processed;
+            if (currentCategoryFilter !== 'ALL') {
+                displayData = processed.filter(p => p._category === currentCategoryFilter);
+                document.getElementById('category-filters').innerHTML = `
+                    <div class="flex items-center gap-2 bg-slate-100 px-3 py-1 rounded-full text-xs font-bold text-slate-600">
+                        Filtro Activo: <span class="text-principal">${currentCategoryFilter}</span>
+                        <button onclick="window.applyCategoryFilter('ALL')" class="text-red-500 hover:text-red-700 ml-1"><i class="fas fa-times"></i></button>
+                    </div>
+                `;
+            } else {
+                document.getElementById('category-filters').innerHTML = '';
+            }
+            
+            window.currentExportData = processed; // Guardar para exportación PDF
+
+            thead.innerHTML = `<tr>
+                <th class="px-4 py-3">Cód</th>
+                <th class="px-4 py-3">Descripción</th>
+                <th class="px-4 py-3 text-right">Costo Total</th>
+                <th class="px-4 py-3 text-right">Tarifa 2026 (Proy)</th>
+                <th class="px-4 py-3 text-right">Var %</th>
+                <th class="px-4 py-3 text-center">Categoría</th>
+            </tr>`;
+
+            const pageData = displayData.slice(0, 200); // Límite visual
+
+            if(pageData.length === 0) {
+                 tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-slate-400">No hay datos para esta categoría.</td></tr>';
+            } else {
+                tbody.innerHTML = pageData.map(r => `
+                    <tr class="hover:bg-slate-50 border-b border-slate-100">
+                        <td class="px-4 py-2 font-mono text-xs text-slate-600">${r.codigo || '-'}</td>
+                        <td class="px-4 py-2 truncate max-w-xs" title="${r.desc}">${String(r.desc).substring(0,40)}</td>
+                        <td class="px-4 py-2 text-right">${formatMoney(r._costoTotal)}</td>
+                        <td class="px-4 py-2 text-right font-bold text-blue-800">${formatMoney(r._tarifaVenta2026)}</td>
+                        <td class="px-4 py-2 text-right text-green-600 text-[10px]">${r._variacionRelativa.toFixed(1)}%</td>
+                        <td class="px-4 py-2 text-center"><span class="px-2 py-0.5 rounded text-[10px] ${r.badgeClass}">${r._category}</span></td>
+                    </tr>
+                `).join('');
+            }
+        }
+
+        window.applyCategoryFilter = function(filterVal) {
+            currentCategoryFilter = filterVal;
+            const sheet = document.getElementById('char-book-select').value;
+            window.renderCharacterizationTable(sheet);
+        }
+
+        window.downloadCharacterizationExcel = function() {
+            if(!window.currentExportData || window.currentExportData.length === 0) { alert("No hay datos para exportar."); return; }
+            const exportData = window.currentExportData.map(r => ({
+                "Código": r.codigo,
+                "Descripción": r.desc,
+                "Costo Total Estimado": r._costoTotal,
+                "Tarifa Proyectada 2026": r._tarifaVenta2026,
+                "Variación %": r._variacionRelativa/100,
+                "Categoría": r._category
+            }));
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Caracterizacion_2026");
+            XLSX.writeFile(wb, "Caracterizacion_Tarifas_2026.xlsx");
         }
 
         function analyzeSheetSummary(data) {
@@ -1484,7 +1437,8 @@
                     return [
                         key,
                         d.items,
-                        d.increment + " %",
+                        // d.increment + " %", // REMOVIDO: Ya no es un incremento único
+                        "Variable", // Indicador de que son múltiples
                         formatMoney(d.totalCost),
                         formatMoney(d.totalRevenue26),
                         formatMoney(d.margin)
@@ -1536,7 +1490,6 @@
             doc.setTextColor(49, 39, 130); doc.setFont("helvetica", "bold"); doc.setFontSize(11);
             doc.text("CONCLUSIONES DEL MODELO", margins.left + 2, currentY); currentY += 10;
             doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(20);
-            // Reutiliza totalInd calculado al inicio de la función
             const conclusions = [ `1. SOSTENIBILIDAD FINANCIERA: La estructura de costos definida incorpora un margen de recuperación indirecta del ${totalInd}%, distribuido en mano de obra, logística y administración.`, "", `2. EFICIENCIA PARETO Y FLUJO DE CAJA: El análisis evidencia que la gestión de inventarios debe focalizarse estrictamente en los productos Tipo A.`, "", `3. IMPACTO TARIFARIO Y REGULACIÓN: La caracterización de bienes permite discriminar entre productos regulados y de mercado libre.` ];
             doc.text(conclusions, margins.left, currentY, { maxWidth: pageWidth - 30, align: "justify" }); currentY += 50;
 
@@ -1552,213 +1505,54 @@
             doc.save(`Informe_Tarifas_Consolidado_${consecutive}.pdf`);
         };
         
-        // --- HELPERS (DEBEN ESTAR AL FINAL) ---
-        window.applyCategoryFilter = function(category, btnElement) {
-            currentCategoryFilter = category;
-            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active', 'scale-105', 'opacity-100'));
-            if (btnElement) { btnElement.classList.add('active', 'scale-105', 'opacity-100'); } else { const targetBtn = Array.from(document.querySelectorAll('.filter-btn')).find(b => b.textContent.includes(category)); if(targetBtn) targetBtn.classList.add('active', 'scale-105', 'opacity-100'); }
-            const currentBook = document.getElementById('char-book-select').value;
-            if(currentBook) window.renderCharacterizationTable(currentBook);
-        }
-
-        window.renderCharacterizationTable = function(sheetName) {
-            const thead = document.getElementById('char-table-head');
-            const tbody = document.getElementById('char-table-body');
-            tbody.innerHTML = ''; thead.innerHTML = '';
-            const select = document.getElementById('char-book-select');
-            if(select.value !== sheetName && sheetName) select.value = sheetName;
-            
-            let sheetsToProcess = [];
-            if (sheetName === 'all') { 
-                sheetsToProcess = Object.keys(window.sheetsData);
-            } else { 
-                if (!sheetName || !window.sheetsData[sheetName]) { tbody.innerHTML = '<tr><td colspan="100%" class="px-4 py-8 text-center text-slate-400">Seleccione un libro válido para la caracterización.</td></tr>'; return; } 
-                sheetsToProcess = [sheetName];
-            }
-
-            if (sheetsToProcess.length === 0) { tbody.innerHTML = '<tr><td colspan="100%" class="px-4 py-8 text-center text-slate-400">No hay datos para visualizar.</td></tr>'; return; }
-            
-            // Obtener headers de la primera hoja válida
-            const firstSheetData = window.sheetsData[sheetsToProcess[0]];
-            if (!firstSheetData || firstSheetData.length === 0) return;
-            const originalHeaders = Object.keys(firstSheetData[0]);
-
-            const incrementPercent = parseFloat(document.getElementById('increment-percent').value) || 0;
-            const totalIndirectPercent = window.costStructure.reduce((sum, item) => sum + item.percent, 0);
-            
-            let headerHTML = '<tr>';
-            originalHeaders.forEach(h => { headerHTML += `<th class="px-4 py-3 whitespace-nowrap">${h}</th>`; });
-            headerHTML += '<th class="px-4 py-3 text-right bg-blue-50 border-l border-blue-200">Costos Indirectos</th>';
-            headerHTML += '<th class="px-4 py-3 text-right bg-blue-50">Costo Total</th>';
-            headerHTML += '<th class="px-4 py-3 text-right bg-blue-50">Costo 2026 (Proy)</th>';
-            headerHTML += '<th class="px-4 py-3 text-right bg-blue-900 text-white font-bold border-l border-blue-700">Tarifa Venta 2026</th>';
-            headerHTML += '<th class="px-4 py-3 text-right bg-green-50 border-l border-green-200 font-bold text-green-800">Var. Absoluta ($)</th>';
-            headerHTML += '<th class="px-4 py-3 text-right bg-green-50 font-bold text-green-800">Var. Relativa (%)</th>';
-            headerHTML += '<th class="px-4 py-3 text-center font-bold bg-blue-900 text-white">CATEGORIZACIÓN</th>';
-            headerHTML += '</tr>';
-            thead.innerHTML = headerHTML;
-            
-            let categoryCounts = { 'BLACK': 0, 'ELITE': 0, 'PLATINO': 0, 'ORO': 0, 'PLATA': 0, 'CLÁSICOS': 0, 'REGULADOS': 0, 'PRODUCTOS SIN FRECUENCIA DE USO': 0 };
-            let processedData = [];
-
-            sheetsToProcess.forEach(sName => {
-                const rows = window.sheetsData[sName];
-                const isRegulatedSheet = sName.toUpperCase().includes('REGULADOS');
-
-                const sheetProcessed = rows.map(row => {
-                    const desc = getColumnVal(row, ['descripción', 'descripcion']);
-                    
-                    // --- CAMBIO PRINCIPAL: USO DE NUEVA LÓGICA DE PRECIOS ---
-                    const valCompra = window.determinePurchasePrice(row, sName);
-
-                    const precio2025 = cleanCurrency(getColumnVal(row, ['precio 2025'])); 
-                    const precio2026 = cleanCurrency(getColumnVal(row, ['precio 2026', 'tarifa 2026', 'valor 2026', 'proyección 2026', 'venta 2026', 'precio regulado', 'valor regulado', 'tope', 'regulado']));
-                    
-                    const pareto = (getColumnVal(row, ['pareto', 'páreto']) || 'N/A').toUpperCase().trim();
-                    const identA = (getColumnVal(row, ['identificación', 'identificacion', 'a+']) || '').toUpperCase();
-                    const costosIndirectos = valCompra * (totalIndirectPercent / 100);
-                    const costoTotal = valCompra + costosIndirectos;
-                    const costo2026 = costoTotal * (1 + (incrementPercent / 100));
-                    
-                    let category = "SIN FRECUENCIA";
-                    let badgeClass = "bg-slate-100 text-slate-500";
-                    let tarifaVenta2026 = 0;
-
-                    if (pareto === 'A' && identA === 'SI') { category = "BLACK"; badgeClass = "bg-cat-black"; }
-                    else if (pareto === 'A') { category = "ELITE"; badgeClass = "bg-cat-elite"; }
-                    else if (pareto === 'B') { category = "ORO"; badgeClass = "bg-cat-oro"; }
-                    else if (pareto === 'C') { category = "PLATA"; badgeClass = "bg-cat-plata"; }
-                    else if (valCompra === 0) { category = "PRODUCTOS SIN FRECUENCIA DE USO"; badgeClass = "bg-cat-sinfreq"; }
-                    else { category = "CLÁSICOS"; badgeClass = "bg-cat-clasicos"; }
-                    
-                    if (isRegulatedSheet || (desc && desc.toLowerCase().includes('regulado'))) { 
-                        category = "REGULADOS"; 
-                        badgeClass = "bg-cat-regulados"; 
-                    }
-
-                    if (category === "REGULADOS") { 
-                         tarifaVenta2026 = (precio2026 > 0) ? Math.round(precio2026) : Math.round(precio2025);
-                    } else { 
-                        tarifaVenta2026 = Math.round(precio2025 * (1 + (incrementPercent / 100))); 
-                    }
-
-                    const variacionAbsoluta = tarifaVenta2026 - precio2025;
-                    const variacionRelativa = precio2025 !== 0 ? (variacionAbsoluta / precio2025) * 100 : 0;
-                    if (categoryCounts.hasOwnProperty(category)) { categoryCounts[category]++; } else { categoryCounts[category] = 1; }
-                    
-                    return { ...row, _costosIndirectos: costosIndirectos, _costoTotal: costoTotal, _costo2026: costo2026, _tarifaVenta2026: tarifaVenta2026, _variacionAbsoluta: variacionAbsoluta, _variacionRelativa: variacionRelativa, _category: category, _badgeClass: badgeClass };
-                });
-                processedData = processedData.concat(sheetProcessed);
-            });
-
-            currentExportData = processedData;
-            window.renderFilterButtons(categoryCounts, processedData.length);
-            window.updateCharacterizationChartsData(categoryCounts);
-            
-            if (currentCategoryFilter !== 'ALL') { processedData = processedData.filter(d => d._category === currentCategoryFilter); }
-            
-            const displayData = processedData.slice(0, 500); // Mantenemos un slice para la visualización por defecto en la Sec. V si el consolidated es muy grande, aunque la exportación sea completa.
-            const html = displayData.map(d => {
-                let rowHTML = '<tr class="hover:bg-slate-50 transition-colors border-b border-slate-100">';
-                originalHeaders.forEach(h => { let val = d[h]; if (typeof val === 'number' && val > 1000) val = formatMoney(val); rowHTML += `<td class="px-4 py-2 truncate max-w-xs text-xs border-r border-slate-50" title="${val}">${val}</td>`; });
-                rowHTML += `<td class="px-4 py-2 text-right text-xs bg-blue-50 text-slate-600">${formatMoney(d._costosIndirectos)}</td>`;
-                rowHTML += `<td class="px-4 py-2 text-right text-xs bg-blue-50 text-slate-700 font-semibold">${formatMoney(d._costoTotal)}</td>`;
-                rowHTML += `<td class="px-4 py-2 text-right text-xs bg-blue-50 text-slate-800 font-bold">${formatMoney(d._costo2026)}</td>`;
-                rowHTML += `<td class="px-4 py-2 text-right font-extrabold text-white bg-blue-800 text-xs shadow-inner border-l-2 border-white">${formatMoney(d._tarifaVenta2026)}</td>`;
-                rowHTML += `<td class="px-4 py-2 text-right text-xs bg-green-50 text-green-700 font-bold border-l border-green-100">${formatMoney(d._variacionAbsoluta)}</td>`;
-                rowHTML += `<td class="px-4 py-2 text-right text-xs bg-green-50 text-green-700 font-bold">${d._variacionRelativa.toFixed(2)}%</td>`;
-                rowHTML += `<td class="px-4 py-2 text-center"><span class="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${d._badgeClass}">${d._category}</span></td>`;
-                rowHTML += '</tr>';
-                return rowHTML;
-            }).join('');
-            tbody.innerHTML = html || '<tr><td colspan="100%" class="px-4 py-8 text-center text-slate-400">No hay productos en esta categoría.</td></tr>';
-        }
-
-        window.downloadCharacterizationExcel = function() {
-            if (!currentExportData || currentExportData.length === 0) { alert("No hay datos para exportar. Cargue un archivo primero."); return; }
-            const exportArray = currentExportData.map(d => {
-                const newRow = {};
-                Object.keys(d).forEach(key => { if (!key.startsWith('_')) newRow[key] = d[key]; });
-                
-                // Calculamos el margen y la observación para esta exportación también
-                const margen = d._tarifaVenta2026 - d._costoTotal;
-                const observacion = margen < 0 ? 'Se recomienda validar el ítem' : '';
-
-                newRow['Costos Indirectos'] = d._costosIndirectos;
-                newRow['Costo Total'] = d._costoTotal;
-                newRow['Costo Proyectado 2026'] = d._costo2026;
-                newRow['Tarifa Venta 2026'] = d._tarifaVenta2026;
-                newRow['Margen Neto ($)'] = margen; // Añadimos Margen
-                newRow['Variación Absoluta 25-26 ($)'] = d._variacionAbsoluta;
-                newRow['Variación Relativa 25-26 (%)'] = d._variacionRelativa / 100; 
-                newRow['Categoría Final'] = d._category;
-                newRow['Observación'] = observacion; // Añadimos Observación
-                return newRow;
-            });
-            const ws = XLSX.utils.json_to_sheet(exportArray);
-            const wb = XLSX.utils.book_new();
-            const sheetNameSafe = (document.getElementById('char-book-select').value || "Datos").substring(0, 30);
-            XLSX.utils.book_append_sheet(wb, ws, sheetNameSafe);
-            XLSX.writeFile(wb, `Caracterizacion_${sheetNameSafe}_2026.xlsx`);
-        }
-
-        window.renderFilterButtons = function(counts, total) {
-            const container = document.getElementById('category-filters');
-            const filters = [
-                { id: 'ALL', label: `TODOS (${total})`, class: 'bg-slate-600 text-white' },
-                { id: 'BLACK', label: `BLACK (${counts['BLACK']})`, class: 'bg-cat-black' },
-                { id: 'ELITE', label: `ELITE (${counts['ELITE']})`, class: 'bg-cat-elite' },
-                { id: 'PLATINO', label: `PLATINO (${counts['PLATINO']})`, class: 'bg-cat-platino' },
-                { id: 'ORO', label: `ORO (${counts['ORO']})`, class: 'bg-cat-oro' },
-                { id: 'PLATA', label: `PLATA (${counts['PLATA']})`, class: 'bg-cat-plata' },
-                { id: 'CLÁSICOS', label: `CLÁSICOS (${counts['CLÁSICOS']})`, class: 'bg-cat-clasicos' },
-                { id: 'REGULADOS', label: `REGULADOS (${counts['REGULADOS']})`, class: 'bg-cat-regulados' },
-                { id: 'PRODUCTOS SIN FRECUENCIA DE USO', label: `SIN FREQ. (${counts['PRODUCTOS SIN FRECUENCIA DE USO']})`, class: 'bg-cat-sinfreq' }
-            ];
-            container.innerHTML = filters.map(f => `
-                <button class="filter-btn text-[10px] px-2 py-1 rounded-full uppercase ${f.class} ${currentCategoryFilter === f.id ? 'active scale-105 opacity-100' : ''}" 
-                    onclick="window.applyCategoryFilter('${f.id}', this)">${f.label}
-                </button>
-            `).join('');
-        }
-
-        window.updateCharacterizationChartsData = function(counts) {
-            const order = ['BLACK', 'ELITE', 'PLATINO', 'ORO', 'PLATA', 'CLÁSICOS', 'REGULADOS', 'PRODUCTOS SIN FRECUENCIA DE USO'];
-            const labels = order.filter(k => counts[k] > 0);
-            const data = labels.map(k => counts[k]);
-            const colorMap = { 'BLACK': '#000000', 'ELITE': '#4b0082', 'PLATINO': '#e5e4e2', 'ORO': '#ffd700', 'PLATA': '#c0c0c0', 'CLÁSICOS': '#3b82f6', 'REGULADOS': '#10b981', 'PRODUCTOS SIN FRECUENCIA DE USO': '#ef4444' };
-            const colors = labels.map(l => colorMap[l] || '#888');
-            if(characterizationChart) { characterizationChart.data = { labels: labels, datasets: [{ data: data, backgroundColor: colors, borderWidth: 1 }] }; characterizationChart.update(); }
-            if(characterizationBarChart) { characterizationBarChart.data = { labels: labels, datasets: [{ data: data, backgroundColor: colors, borderWidth: 1, borderRadius: 4 }] }; characterizationBarChart.update(); }
-        }
-
         window.searchInventory = function() {
             const sheetName = document.getElementById('inventory-book-select').value;
             const query = document.getElementById('inventory-search-input').value;
             if(!sheetName) { alert("Seleccione un libro primero."); return; }
             window.renderInventoryTable(sheetName, query, currentParetoFilter);
         }
+
         window.clearInventorySearch = function() {
             document.getElementById('inventory-search-input').value = "";
             const sheetName = document.getElementById('inventory-book-select').value;
             currentParetoFilter = 'ALL'; 
             window.renderInventoryTable(sheetName, "");
         }
+
         window.populateSelectors = function() {
             const paretoSelect = document.getElementById('pareto-book-select');
             const invSelect = document.getElementById('inventory-book-select');
             const charSelect = document.getElementById('char-book-select'); 
-            const currPareto = paretoSelect.value;
-            const currInv = invSelect.value;
-            const currChar = charSelect.value;
+            
+            const currPareto = paretoSelect ? paretoSelect.value : '';
+            const currInv = invSelect ? invSelect.value : '';
+            const currChar = charSelect ? charSelect.value : '';
+            
             let opts = '<option value="">Seleccione...</option>';
             let paretoOpts = '<option value="all">CONSOLIDADO GENERAL</option>';
-            window.productGroups.forEach(g => { opts += `<option value="${g.name}">${g.name}</option>`; paretoOpts += `<option value="${g.name}">${g.name}</option>`; });
-            invSelect.innerHTML = opts; paretoSelect.innerHTML = paretoOpts; charSelect.innerHTML = paretoOpts; 
-            if(window.productGroups.length > 0) { if(!currInv) invSelect.value = window.productGroups[0].name; if(!currChar) charSelect.value = window.productGroups[0].name; }
-            if(currInv) invSelect.value = currInv; if(currPareto) paretoSelect.value = currPareto; if(currChar) charSelect.value = currChar;
-            if(invSelect.value) window.renderInventoryTable(invSelect.value);
-            if(charSelect.value && window.sheetsData[charSelect.value]) window.renderCharacterizationTable(charSelect.value);
+            
+            if (window.productGroups && window.productGroups.length > 0) {
+                window.productGroups.forEach(g => { 
+                    opts += `<option value="${g.name}">${g.name}</option>`; 
+                    paretoOpts += `<option value="${g.name}">${g.name}</option>`; 
+                });
+            }
+            
+            if (invSelect) invSelect.innerHTML = opts; 
+            if (paretoSelect) paretoSelect.innerHTML = paretoOpts; 
+            if (charSelect) charSelect.innerHTML = paretoOpts; 
+            
+            if(window.productGroups.length > 0) { 
+                if(!currInv && invSelect) invSelect.value = window.productGroups[0].name; 
+                if(!currChar && charSelect) charSelect.value = window.productGroups[0].name; 
+            }
+            
+            if(currInv && invSelect) invSelect.value = currInv; 
+            if(currPareto && paretoSelect) paretoSelect.value = currPareto; 
+            if(currChar && charSelect) charSelect.value = currChar;
+            
+            if(invSelect && invSelect.value) window.renderInventoryTable(invSelect.value);
+            if(charSelect && charSelect.value && window.sheetsData[charSelect.value]) window.renderCharacterizationTable(charSelect.value);
         }
     </script>
 </body>
