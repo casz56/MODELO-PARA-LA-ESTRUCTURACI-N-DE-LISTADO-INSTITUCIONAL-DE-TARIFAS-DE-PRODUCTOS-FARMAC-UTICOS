@@ -251,6 +251,25 @@
             margin-bottom: 0.25rem;
             display: block;
         }
+        
+        /* Estilos para encabezados ordenables */
+        .sortable-header {
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.2s;
+        }
+        .sortable-header:hover {
+            background-color: #4b3d96; /* Un tono más claro que el bg-principal */
+        }
+        .sort-icon {
+            margin-left: 0.5rem;
+            font-size: 0.8em;
+            opacity: 0.7;
+        }
+        .sort-icon.active {
+            opacity: 1;
+            color: #fbbf24; /* Amber 400 */
+        }
     </style>
 </head>
 <body class="p-4 md:p-8 text-slate-800 flex flex-col min-h-screen">
@@ -285,8 +304,9 @@
                     <p class="text-sm text-slate-600 ml-2 mb-2">Aquí se gestiona cada libro por separado. Use el gráfico de torta para ver la distribución y la tabla para el detalle.</p>
                      <ul class="list-disc list-inside text-sm text-slate-600 ml-2 space-y-2">
                         <li><strong>Incrementos por Categoría:</strong> Ajuste el % de incremento para cada grupo (Black, Elite, Clásicos, etc.) de forma independiente.</li>
+                        <li><strong>Filtros Avanzados:</strong> Use los selectores para filtrar por observaciones y por <strong>Categoría</strong> (Black, Elite, etc.).</li>
+                        <li><strong>Ordenamiento:</strong> Haga clic en los encabezados de la tabla para ordenar (ej: <strong>Costo Total</strong> o <strong>Margen</strong>) de mayor a menor.</li>
                         <li><strong>Gráfica Interactiva:</strong> A la izquierda de cada tabla, verá la distribución por categoría.</li>
-                        <li><strong>Filtros:</strong> Use el selector "Ver:" para filtrar ítems con observaciones.</li>
                         <li><strong>Guardar:</strong> Es OBLIGATORIO hacer clic en <strong>"Guardar"</strong> para incluir la configuración en el PDF.</li>
                     </ul>
                 </div>
@@ -321,7 +341,7 @@
                     <i class="fas fa-undo mr-2"></i> Restablecer
                 </button>
                  <button onclick="window.generateFullReport()" class="bg-secundario hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow-md transition-colors flex items-center justify-center font-semibold text-xs ring-1 ring-green-600 w-full">
-                    <i class="fas fa-file-pdf mr-2"></i> Informe Completo
+                    <i class="fas fa-file-pdf mr-2"></i> Descargar Acta
                 </button>
             </div>
         </header>
@@ -410,7 +430,7 @@
             <section id="section-analisis-tarifas" class="bg-slate-50 p-6 rounded-xl shadow-inner border border-slate-300">
                 <div class="mb-6">
                     <h2 class="text-xl font-bold text-slate-800 mb-2">VII. Análisis de Tarifas por Libro (Detallado)</h2>
-                    <p class="text-sm text-slate-600">Defina el incremento individual por categoría y guarde la configuración para el informe final consolidado.</p>
+                    <p class="text-sm text-slate-600">Defina el incremento individual por categoría y guarde la configuración para el informe final consolidado. <strong class="text-principal">Nota:</strong> La columna "Var %" corresponde a la Rentabilidad sobre Costo (Margen / Costo Total).</p>
                 </div>
                 <div id="rate-analysis-container" class="space-y-8"><div class="text-center py-10 text-slate-400"><i class="fas fa-layer-group text-3xl mb-2"></i><p>Cargue un archivo para visualizar las tablas de análisis individual.</p></div></div>
             </section>
@@ -432,6 +452,8 @@
         window.finalizedAnalysis = {}; 
         // NUEVO: Almacén de instancias de gráficos para Sección VII
         window.sheetCharts = {};
+        // NUEVO: Estado de ordenamiento para cada tabla { safeId: { column: string, direction: 'asc'|'desc' } }
+        window.sheetSortState = {};
 
         let Logo_HUHMP_Blanco = ""; 
         let currentPieMode = 'count';
@@ -489,6 +511,7 @@
             window.finalizedAnalysis = {}; 
             // Resetear graficos de libros
             window.sheetCharts = {};
+            window.sheetSortState = {}; // Reset sort state
             currentCategoryFilter = 'ALL';
             currentParetoFilter = 'ALL';
             
@@ -521,7 +544,40 @@
             return valPrimary;
         }
 
-        // --- FUNCIONES SECCIÓN VII (NUEVAS + GRÁFICAS) ---
+        // --- FUNCIONES SECCIÓN VII (NUEVAS + GRÁFICAS + ORDENAMIENTO) ---
+        
+        // Función helper para manejar el clic en el encabezado
+        window.handleSort = function(sheetNameSafe, safeId, column) {
+            // Inicializar si no existe
+            if (!window.sheetSortState[safeId]) {
+                window.sheetSortState[safeId] = { column: null, direction: 'desc' };
+            }
+            
+            const state = window.sheetSortState[safeId];
+            
+            if (state.column === column) {
+                // Si ya estaba ordenando por esta columna, invertir dirección
+                state.direction = state.direction === 'desc' ? 'asc' : 'desc';
+            } else {
+                // Nueva columna, empezar Descendente (Mayor a Menor) por defecto para números
+                state.column = column;
+                state.direction = 'desc';
+            }
+            
+            // Re-renderizar tabla con el nuevo orden
+            // sheetNameSafe puede tener caracteres escapados, pasamos el raw sheet name si es posible o buscamos en sheetsData
+            // En updateSheetTable buscamos por el sheetName original.
+            // Para simplificar, pasamos el sheetName original recuperandolo de productGroups o sheetsData si es complejo,
+            // pero aquí pasamos el string escapado que viene del HTML. Necesitamos "desescapar" o usar el safeId para buscar
+            
+            // Truco: sheetNameSafe viene con quotes escapadas.
+            const originalSheetName = Object.keys(window.sheetsData).find(k => k.replace(/[^a-zA-Z0-9]/g, '_') === safeId);
+            
+            if (originalSheetName) {
+                window.updateSheetTable(originalSheetName, safeId);
+            }
+        }
+
         window.renderRateAnalysisSection = function() {
             const container = document.getElementById('rate-analysis-container');
             if (!window.sheetsData || Object.keys(window.sheetsData).length === 0) {
@@ -533,57 +589,72 @@
             
             Object.keys(window.sheetsData).forEach((sheetName) => {
                 const safeId = sheetName.replace(/[^a-zA-Z0-9]/g, '_');
+                const sheetNameSafe = sheetName.replace(/'/g, "\\'");
                 
                 // Generar Inputs para cada categoría
                 const inputsHtml = `
                     <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 mb-4 bg-slate-50 p-2 rounded border border-slate-200">
                          <div>
                             <label class="increment-label">Black</label>
-                            <input type="number" id="inc-black-${safeId}" value="10" class="table-input text-right" onchange="window.updateSheetTable('${sheetName.replace(/'/g, "\\'")}', '${safeId}')">
+                            <input type="number" id="inc-black-${safeId}" value="10" class="table-input text-right" onchange="window.updateSheetTable('${sheetNameSafe}', '${safeId}')">
                         </div>
                         <div>
                             <label class="increment-label">Elite</label>
-                            <input type="number" id="inc-elite-${safeId}" value="10" class="table-input text-right" onchange="window.updateSheetTable('${sheetName.replace(/'/g, "\\'")}', '${safeId}')">
+                            <input type="number" id="inc-elite-${safeId}" value="10" class="table-input text-right" onchange="window.updateSheetTable('${sheetNameSafe}', '${safeId}')">
                         </div>
                         <div>
                             <label class="increment-label">Oro</label>
-                            <input type="number" id="inc-oro-${safeId}" value="10" class="table-input text-right" onchange="window.updateSheetTable('${sheetName.replace(/'/g, "\\'")}', '${safeId}')">
+                            <input type="number" id="inc-oro-${safeId}" value="10" class="table-input text-right" onchange="window.updateSheetTable('${sheetNameSafe}', '${safeId}')">
                         </div>
                         <div>
                             <label class="increment-label">Plata</label>
-                            <input type="number" id="inc-plata-${safeId}" value="10" class="table-input text-right" onchange="window.updateSheetTable('${sheetName.replace(/'/g, "\\'")}', '${safeId}')">
+                            <input type="number" id="inc-plata-${safeId}" value="10" class="table-input text-right" onchange="window.updateSheetTable('${sheetNameSafe}', '${safeId}')">
                         </div>
                         <div>
                             <label class="increment-label">Clásicos</label>
-                            <input type="number" id="inc-clasicos-${safeId}" value="10" class="table-input text-right" onchange="window.updateSheetTable('${sheetName.replace(/'/g, "\\'")}', '${safeId}')">
+                            <input type="number" id="inc-clasicos-${safeId}" value="10" class="table-input text-right" onchange="window.updateSheetTable('${sheetNameSafe}', '${safeId}')">
                         </div>
                         <div>
                             <label class="increment-label">Regulados</label>
-                            <input type="number" id="inc-regulados-${safeId}" value="0" class="table-input text-right" title="Solo aplica si no hay precio fijo 2026" onchange="window.updateSheetTable('${sheetName.replace(/'/g, "\\'")}', '${safeId}')">
+                            <input type="number" id="inc-regulados-${safeId}" value="0" class="table-input text-right" title="Solo aplica si no hay precio fijo 2026" onchange="window.updateSheetTable('${sheetNameSafe}', '${safeId}')">
                         </div>
                          <div>
                             <label class="increment-label">Sin Freq</label>
-                            <input type="number" id="inc-sinfreq-${safeId}" value="0" class="table-input text-right" onchange="window.updateSheetTable('${sheetName.replace(/'/g, "\\'")}', '${safeId}')">
+                            <input type="number" id="inc-sinfreq-${safeId}" value="0" class="table-input text-right" onchange="window.updateSheetTable('${sheetNameSafe}', '${safeId}')">
                         </div>
                     </div>
                 `;
 
-                // --- CAMBIO: ESTRUCTURA GRID PARA GRÁFICA (IZQ) Y TABLA (DER) ---
+                // --- CAMBIO: AGREGADO SWITCH DE FILTRO POR CATEGORÍA ---
                 const html = `
                     <div class="bg-white p-4 rounded-lg shadow border border-slate-200" id="analysis-block-${safeId}">
                         <div class="flex flex-col sm:flex-row justify-between items-center mb-4 border-b pb-2 gap-4">
                             <h3 class="font-bold text-principal text-lg"><i class="fas fa-book mr-2"></i>${sheetName}</h3>
                             <div class="flex flex-wrap items-center gap-4 bg-slate-50 p-2 rounded-lg">
+                                <!-- FILTRO CATEGORÍA -->
+                                <div class="flex items-center gap-2 border-r border-slate-300 pr-4 mr-2">
+                                    <label class="text-xs font-bold text-slate-600 uppercase"><i class="fas fa-layer-group mr-1"></i>Cat:</label>
+                                    <select id="cat-filter-${safeId}" class="table-input w-32 text-xs font-bold text-principal border-blue-300 focus:border-blue-500" onchange="window.updateSheetTable('${sheetNameSafe}', '${safeId}')">
+                                        <option value="ALL">TODAS</option>
+                                        <option value="BLACK">BLACK</option>
+                                        <option value="ELITE">ELITE</option>
+                                        <option value="ORO">ORO</option>
+                                        <option value="PLATA">PLATA</option>
+                                        <option value="CLÁSICOS">CLÁSICOS</option>
+                                        <option value="REGULADOS">REGULADOS</option>
+                                        <option value="PRODUCTOS SIN FRECUENCIA DE USO">SIN FREQ</option>
+                                    </select>
+                                </div>
                                 <div class="flex items-center gap-2 border-r border-slate-300 pr-4 mr-2">
                                     <label class="text-xs font-bold text-slate-600 uppercase"><i class="fas fa-filter mr-1"></i>Ver:</label>
-                                    <select id="filter-${safeId}" class="table-input w-36 text-xs font-bold text-principal border-blue-300 focus:border-blue-500" onchange="window.updateSheetTable('${sheetName.replace(/'/g, "\\'")}', '${safeId}')">
+                                    <select id="filter-${safeId}" class="table-input w-36 text-xs font-bold text-principal border-blue-300 focus:border-blue-500" onchange="window.updateSheetTable('${sheetNameSafe}', '${safeId}')">
                                         <option value="ALL">Ver Todos</option>
                                         <option value="WITH_OBS">⚠️ Con Observaciones</option>
                                         <option value="WITHOUT_OBS">✅ Sin Observaciones</option>
                                     </select>
                                 </div>
-                                <button onclick="window.saveSheetAnalysis('${sheetName.replace(/'/g, "\\'")}', '${safeId}')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow text-xs font-bold flex items-center gap-2 transition-transform active:scale-95"><i class="fas fa-save"></i> Guardar</button>
-                                <button onclick="window.downloadSheetAnalysisExcel('${sheetName.replace(/'/g, "\\'")}')" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow text-xs font-bold flex items-center gap-2 transition-transform active:scale-95"><i class="fas fa-file-excel"></i> Descargar Libro</button>
+                                <button onclick="window.saveSheetAnalysis('${sheetNameSafe}', '${safeId}')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow text-xs font-bold flex items-center gap-2 transition-transform active:scale-95"><i class="fas fa-save"></i> Guardar</button>
+                                <button onclick="window.downloadSheetAnalysisExcel('${sheetNameSafe}')" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow text-xs font-bold flex items-center gap-2 transition-transform active:scale-95"><i class="fas fa-file-excel"></i> Descargar Libro</button>
                                 <span id="status-${safeId}" class="text-xs font-bold text-slate-400 italic">Sin guardar</span>
                             </div>
                         </div>
@@ -604,16 +675,32 @@
                             <!-- COLUMNA DERECHA: TABLA -->
                             <div class="lg:col-span-2 inventory-table-container max-h-[400px]">
                                 <table class="w-full text-xs text-left inventory-table">
-                                    <thead class="text-xs uppercase bg-slate-700 text-white sticky top-0">
+                                    <thead class="text-xs uppercase bg-slate-700 text-white sticky top-0 shadow-lg">
                                         <tr>
-                                            <th class="px-4 py-2">Cód</th>
-                                            <th class="px-4 py-2">Descripción</th>
-                                            <th class="px-4 py-2 text-right">Costo Total</th>
-                                            <th class="px-4 py-2 text-right">Tarifa 2026</th>
-                                            <th class="px-4 py-2 text-right bg-blue-50 font-bold border-l border-blue-200">Margen ($)</th>
-                                            <th class="px-4 py-2 text-right">Var %</th>
-                                            <th class="px-4 py-2 text-center bg-yellow-100 text-yellow-900 border-l border-yellow-300">Observación</th>
-                                            <th class="px-4 py-2 text-center">Categoría</th>
+                                            <th class="px-4 py-2 sortable-header" onclick="window.handleSort('${sheetNameSafe}', '${safeId}', 'codigo')">
+                                                <div class="flex items-center justify-between">Cód <i id="sort-${safeId}-codigo" class="fas fa-sort sort-icon"></i></div>
+                                            </th>
+                                            <th class="px-4 py-2 sortable-header" onclick="window.handleSort('${sheetNameSafe}', '${safeId}', 'desc')">
+                                                <div class="flex items-center justify-between">Descripción <i id="sort-${safeId}-desc" class="fas fa-sort sort-icon"></i></div>
+                                            </th>
+                                            <th class="px-4 py-2 text-right sortable-header" onclick="window.handleSort('${sheetNameSafe}', '${safeId}', 'costoTotal')">
+                                                <div class="flex items-center justify-end gap-2">Costo Total <i id="sort-${safeId}-costoTotal" class="fas fa-sort sort-icon"></i></div>
+                                            </th>
+                                            <th class="px-4 py-2 text-right sortable-header" onclick="window.handleSort('${sheetNameSafe}', '${safeId}', 'tarifa26')">
+                                                <div class="flex items-center justify-end gap-2">Tarifa 2026 <i id="sort-${safeId}-tarifa26" class="fas fa-sort sort-icon"></i></div>
+                                            </th>
+                                            <th class="px-4 py-2 text-right bg-blue-800 font-bold border-l border-blue-600 sortable-header" onclick="window.handleSort('${sheetNameSafe}', '${safeId}', 'margen')">
+                                                <div class="flex items-center justify-end gap-2">Margen ($) <i id="sort-${safeId}-margen" class="fas fa-sort sort-icon"></i></div>
+                                            </th>
+                                            <th class="px-4 py-2 text-right sortable-header" title="Rentabilidad sobre Costo: (Margen/Costo)*100" onclick="window.handleSort('${sheetNameSafe}', '${safeId}', 'varRel')">
+                                                <div class="flex items-center justify-end gap-2">Var % (M/C) <i id="sort-${safeId}-varRel" class="fas fa-sort sort-icon"></i></div>
+                                            </th>
+                                            <th class="px-4 py-2 text-center bg-slate-600 border-l border-slate-500 sortable-header" onclick="window.handleSort('${sheetNameSafe}', '${safeId}', 'observacion')">
+                                                <div class="flex items-center justify-center gap-2">Observación <i id="sort-${safeId}-observacion" class="fas fa-sort sort-icon"></i></div>
+                                            </th>
+                                            <th class="px-4 py-2 text-center sortable-header" onclick="window.handleSort('${sheetNameSafe}', '${safeId}', 'category')">
+                                                <div class="flex items-center justify-center gap-2">Categoría <i id="sort-${safeId}-category" class="fas fa-sort sort-icon"></i></div>
+                                            </th>
                                         </tr>
                                     </thead>
                                     <tbody id="tbody-${safeId}" class="divide-y divide-slate-100">
@@ -647,6 +734,10 @@
 
             const filterEl = document.getElementById(`filter-${safeId}`);
             const filterVal = filterEl ? filterEl.value : 'ALL';
+            
+            const catFilterEl = document.getElementById(`cat-filter-${safeId}`);
+            const catFilterVal = catFilterEl ? catFilterEl.value : 'ALL';
+
             const totalIndirect = window.costStructure.reduce((s, i) => s + i.percent, 0);
 
             if (!rawData) { tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-slate-400">Datos no disponibles para este libro.</td></tr>'; return; }
@@ -685,16 +776,29 @@
 
                 let tarifa26 = 0;
                 if (category === "REGULADOS") {
-                    // Lógica para regulados: Si hay precio explícito 2026, úsalo. Si no, usa incremento (si es 0, queda igual)
                     tarifa26 = (precio2026 > 0) ? Math.round(precio2026) : Math.round(precio2025 * (1 + (specificIncrement / 100)));
                 } else {
                     tarifa26 = Math.round(precio2025 * (1 + (specificIncrement / 100)));
                 }
                 
                 const margen = tarifa26 - costoTotal;
-                const varAbs = tarifa26 - precio2025;
-                const varRel = precio2025 !== 0 ? (varAbs / precio2025) * 100 : 0;
-                const observacion = margen < 0 ? 'Se recomienda validar el ítem' : '';
+                
+                // CAMBIO FORMULA: Variación % = (Margen $ / Costo Total) * 100
+                const varRel = costoTotal !== 0 ? (margen / costoTotal) * 100 : 0;
+                
+                // --- NUEVA LÓGICA DE OBSERVACIÓN ---
+                let observacion = '';
+                // Límite superior para alerta de reclasificación (Por defecto 100%, ajustar si la imagen indica otro valor)
+                const UPPER_MARGIN_LIMIT = 100; 
+
+                // Identificar si es ítem regulado para la excepción
+                const isRegulatedItem = category === "REGULADOS";
+
+                if (margen < 0) {
+                    observacion = 'Se recomienda validar el ítem';
+                } else if (varRel >= UPPER_MARGIN_LIMIT && !isRegulatedItem) {
+                    observacion = 'Validar item manualmente debido a que se tendría que reclasifica de agrupador';
+                }
 
                 return {
                     codigo: getColumnVal(row, ['código', 'codigo']),
@@ -709,12 +813,48 @@
                 };
             });
             
-            // FILTRADO (Ahora primero filtramos, luego contamos para la gráfica)
-            const filtered = processed.filter(r => {
-                if (filterVal === 'WITH_OBS') return r.observacion !== ''; 
-                if (filterVal === 'WITHOUT_OBS') return r.observacion === ''; 
+            // FILTRADO (Ahora filtro por observacion Y por categoría)
+            let filtered = processed.filter(r => {
+                if (filterVal === 'WITH_OBS' && r.observacion === '') return false; 
+                if (filterVal === 'WITHOUT_OBS' && r.observacion !== '') return false; 
+                if (catFilterVal !== 'ALL' && r.category !== catFilterVal) return false;
                 return true; 
             });
+
+            // --- LÓGICA DE ORDENAMIENTO ---
+            const sortState = window.sheetSortState[safeId];
+            if (sortState && sortState.column) {
+                const col = sortState.column;
+                const dir = sortState.direction === 'asc' ? 1 : -1;
+                
+                filtered.sort((a, b) => {
+                    let valA = a[col];
+                    let valB = b[col];
+                    
+                    // Manejo de cadenas para sort insensible a mayúsculas
+                    if (typeof valA === 'string') valA = valA.toLowerCase();
+                    if (typeof valB === 'string') valB = valB.toLowerCase();
+                    
+                    if (valA < valB) return -1 * dir;
+                    if (valA > valB) return 1 * dir;
+                    return 0;
+                });
+
+                // Actualizar iconos visualmente
+                const allIcons = document.querySelectorAll(`[id^="sort-${safeId}-"]`);
+                allIcons.forEach(icon => {
+                    icon.className = "fas fa-sort sort-icon"; // Reset
+                });
+                
+                const activeIcon = document.getElementById(`sort-${safeId}-${col}`);
+                if (activeIcon) {
+                    // fa-sort-down es usualmente para Descendente (mayor arriba)
+                    // fa-sort-up es usualmente para Ascendente (menor arriba)
+                    // Ajustamos visual:
+                    const iconClass = sortState.direction === 'asc' ? 'fa-sort-up' : 'fa-sort-down';
+                    activeIcon.className = `fas ${iconClass} sort-icon active`;
+                }
+            }
 
             // --- OBJETO PARA CONTEO DE CATEGORÍAS (GRÁFICA REACTIVA) ---
             let categoryCounts = {
@@ -734,7 +874,7 @@
             window.renderSheetPieChart(safeId, categoryCounts);
 
             if (filtered.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-slate-400">No hay ítems que coincidan con el filtro seleccionado.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-slate-400">No hay ítems que coincidan con los filtros seleccionados.</td></tr>';
             } else {
                 tbody.innerHTML = filtered.map(r => `
                     <tr class="hover:bg-slate-50">
@@ -743,8 +883,8 @@
                         <td class="px-4 py-2 text-right">${formatMoney(r.costoTotal)}</td>
                         <td class="px-4 py-2 text-right font-bold text-blue-800">${formatMoney(r.tarifa26)}</td>
                         <td class="px-4 py-2 text-right font-bold ${r.margen >= 0 ? 'text-green-600' : 'text-red-600'} bg-slate-50 border-l border-slate-200">${formatMoney(r.margen)}</td>
-                        <td class="px-4 py-2 text-right text-green-600 text-[10px]">${r.varRel.toFixed(1)}%</td>
-                        <td class="px-4 py-2 text-xs text-center ${r.margen < 0 ? 'bg-red-100 text-red-700 font-bold' : 'text-slate-500'}">${r.observacion}</td>
+                        <td class="px-4 py-2 text-right ${r.varRel >= 0 ? 'text-green-600' : 'text-red-600'} text-[10px]">${r.varRel.toFixed(1)}%</td>
+                        <td class="px-4 py-2 text-xs text-center ${r.margen < 0 ? 'bg-red-100 text-red-700 font-bold' : (r.observacion.includes('Validar item') ? 'bg-yellow-100 text-yellow-700 font-bold' : 'text-slate-500')}">${r.observacion}</td>
                         <td class="px-4 py-2 text-center"><span class="px-2 py-0.5 rounded text-[10px] ${r.badgeClass}">${r.category}</span></td>
                     </tr>
                 `).join('');
@@ -851,9 +991,24 @@
                 }
 
                 const margen = tarifa26 - costoTotal;
-                const varAbs = tarifa26 - precio2025;
-                const varRel = precio2025 !== 0 ? (varAbs / precio2025) : 0; 
-                const observacion = margen < 0 ? 'Se recomienda validar el ítem' : '';
+                
+                // CAMBIO FORMULA EXCEL TAMBIÉN: (Margen / Costo Total) * 100
+                // En Excel lo dejamos decimal para formato % (ej: 0.5 = 50%)
+                const varRel = costoTotal !== 0 ? (margen / costoTotal) : 0; 
+                
+                // --- NUEVA LÓGICA DE OBSERVACIÓN ---
+                let observacion = '';
+                // Límite superior (en decimal para Excel, 1.0 = 100%)
+                const UPPER_MARGIN_LIMIT_DECIMAL = 1.0; 
+                
+                // Identificar si es ítem regulado para la excepción
+                const isRegulatedItem = category === "REGULADOS";
+
+                if (margen < 0) {
+                    observacion = 'Se recomienda validar el ítem';
+                } else if (varRel >= UPPER_MARGIN_LIMIT_DECIMAL && !isRegulatedItem) {
+                    observacion = 'Validar item manualmente debido a que se tendría que reclasifica de agrupador';
+                }
 
                 const newRow = { ...row };
                 
@@ -861,7 +1016,7 @@
                 newRow['Costo Total'] = costoTotal;
                 newRow['Tarifa Venta 2026'] = tarifa26;
                 newRow['Margen Neto ($)'] = margen;
-                newRow['Variación Relativa 25-26 (%)'] = varRel; 
+                newRow['Rentabilidad sobre Costo (Var %)'] = varRel; // Renombrado para claridad en Excel
                 newRow['Categoría Final'] = category;
                 newRow['Incremento Aplicado (%)'] = specificIncrement;
                 newRow['Observación de Margen'] = observacion;
@@ -1356,21 +1511,20 @@
             const consecutive = String(consecutiveCounter).padStart(6, '0');
             const currentDate = new Date().toLocaleString("es-CO");
             
-            // Calculamos el total indirecto una sola vez
             const totalInd = window.costStructure.reduce((a,b) => a + b.percent, 0).toFixed(2);
 
-
-            // --- HELPER: HEADER ---
+            // --- HEADER ---
             const drawHeader = (doc) => {
                 doc.setFillColor(49, 39, 130); 
                 doc.rect(0, 0, pageWidth, 28, 'F');
                 if(Logo_HUHMP_Blanco) { try { doc.addImage(Logo_HUHMP_Blanco, 'PNG', 10, 4, 20, 20); } catch(e){} }
                 doc.setTextColor(255, 255, 255);
-                doc.setFont("helvetica", "bold"); doc.setFontSize(14); doc.text("INFORME TÉCNICO DE TARIFAS FARMACÉUTICAS 2026", 40, 12);
+                doc.setFont("helvetica", "bold"); doc.setFontSize(14); 
+                // Changed title to Acta
+                doc.text("ACTA DE APROBACIÓN DE TARIFAS VIGENCIA 2026", 40, 12);
                 doc.setFontSize(9); doc.setFont("helvetica", "normal"); doc.text("ESE Hospital Universitario Hernando Moncaleano Perdomo", 40, 18); doc.text("Código: GD-SGI-M-005 | Versión: 01", 40, 23);
             };
 
-            // --- HELPER: FOOTER ---
             const drawFooter = (doc, pageNum, pageCount) => {
                 doc.setDrawColor(200); doc.line(10, pageHeight - 15, pageWidth - 10, pageHeight - 15);
                 doc.setFontSize(7); doc.setTextColor(100); doc.text(`Generado: ${currentDate}`, 15, pageHeight - 10);
@@ -1378,57 +1532,38 @@
                 doc.text(`Consecutivo: ${consecutive}`, pageWidth - 15, pageHeight - 10, { align: 'right' });
             };
 
-            // --- INICIO DOCUMENTO ---
             let currentY = margins.top;
 
-            // 1. TÍTULO DEL REPORTE
+            // PAGE 1
             drawHeader(doc);
-            doc.setTextColor(49, 39, 130); doc.setFontSize(16); doc.setFont("helvetica", "bold");
-            doc.text("ANÁLISIS ESTRUCTURAL DE COSTOS Y TARIFAS", margins.left, currentY); currentY += 10;
+            
+            // Intro
+            doc.setTextColor(49, 39, 130); doc.setFontSize(14); doc.setFont("helvetica", "bold");
+            doc.text("ACTA DE DEFINICIÓN TARIFARIA", margins.left, currentY); currentY += 8;
             doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.setTextColor(50);
-            doc.text("El presente documento detalla la metodología, análisis de datos y proyección tarifaria para la vigencia 2026, conforme a los lineamientos institucionales y regulatorios.", margins.left, currentY, { maxWidth: pageWidth - 30 }); currentY += 15;
+            doc.text("En la presente acta se consolidan los parámetros técnicos, costos indirectos y márgenes de rentabilidad definidos para el manual tarifario de la vigencia 2026.", margins.left, currentY, { maxWidth: pageWidth - 30 }); currentY += 15;
 
-            // --- SECCIÓN: RESUMEN DE PRODUCTOS (ANTIGUO I) ---
-            doc.setFillColor(240, 240, 245); doc.rect(margins.left, currentY - 5, pageWidth - 30, 8, 'F');
+            // SECTION I: RESUMEN (No Roman Numeral)
+            doc.setFillColor(240, 240, 245); doc.rect(margins.left, currentY - 5, pageWidth - 30, 7, 'F');
             doc.setTextColor(49, 39, 130); doc.setFont("helvetica", "bold"); doc.setFontSize(11);
             doc.text("RESUMEN DE PRODUCTOS POR TIPO", margins.left + 2, currentY); currentY += 5;
             const summaryBody = window.productGroups.map(g => [ g.name, g.count, formatMoney(g.cost), formatMoney(g.revenue) ]);
             doc.autoTable({ startY: currentY, head: [['Libro / Fuente', 'Cant. Ítems', 'Costo Total Inventario', 'Venta Proyectada']], body: summaryBody, theme: 'striped', headStyles: { fillColor: [49, 39, 130], textColor: 255, fontSize: 8 }, bodyStyles: { fontSize: 8 }, columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' } }, margin: { left: margins.left, right: margins.right } });
             currentY = doc.lastAutoTable.finalY + 15;
 
-            // (SECCIONES II Y III ELIMINADAS)
-
-            // --- SECCIÓN: COSTOS INDIRECTOS (ANTIGUO IV) ---
+            // SECTION IV: COSTOS (No Roman Numeral)
             if (currentY > pageHeight - 60) { doc.addPage(); drawHeader(doc); currentY = margins.top; }
-            doc.setFillColor(240, 240, 245); doc.rect(margins.left, currentY - 5, pageWidth - 30, 8, 'F');
+            doc.setFillColor(240, 240, 245); doc.rect(margins.left, currentY - 5, pageWidth - 30, 7, 'F');
             doc.setTextColor(49, 39, 130); doc.setFont("helvetica", "bold"); doc.setFontSize(11);
             doc.text("ESTRUCTURA DE COSTOS INDIRECTOS", margins.left + 2, currentY); currentY += 5;
             const costBody = window.costStructure.map(c => [c.name, c.percent + " %"]); costBody.push(['TOTAL RECUPERACIÓN INDIRECTA', totalInd + " %"]);
             doc.autoTable({ startY: currentY, head: [['Rubro de Costo', 'Porcentaje Asignado']], body: costBody, theme: 'grid', tableWidth: 100, headStyles: { fillColor: [49, 39, 130], textColor: 255 }, didParseCell: function(data) { if (data.row.index === costBody.length - 1) data.cell.styles.fontStyle = 'bold'; }, margin: { left: margins.left } }); currentY = doc.lastAutoTable.finalY + 15;
 
-            // --- SECCIÓN: CARACTERIZACIÓN (ANTIGUO V) ---
-            doc.addPage(); drawHeader(doc); currentY = margins.top;
-            doc.setFillColor(240, 240, 245); doc.rect(margins.left, currentY - 5, pageWidth - 30, 8, 'F');
+            // SECTION VII: RESUMEN GERENCIAL (No Roman Numeral)
+            if (currentY > pageHeight - 80) { doc.addPage(); drawHeader(doc); currentY = margins.top; }
+            doc.setFillColor(240, 240, 245); doc.rect(margins.left, currentY - 5, pageWidth - 30, 7, 'F');
             doc.setTextColor(49, 39, 130); doc.setFont("helvetica", "bold"); doc.setFontSize(11);
-            doc.text("CARACTERIZACIÓN Y PROYECCIÓN 2026", margins.left + 2, currentY); currentY += 5;
-            
-            // Lógica para obtener el libro seleccionado
-            let selectedSheet = document.getElementById('inventory-book-select').value; 
-            if(!selectedSheet && window.productGroups.length > 0) selectedSheet = window.productGroups[0].name;
-
-            let charData = []; if (window.currentExportData && window.currentExportData.length > 0) { doc.setFontSize(8); doc.setTextColor(100); doc.text(`Base de cálculo: ${selectedSheet} | Incremento aplicado: ${document.getElementById('increment-percent').value}% | Muestra parcial.`, margins.left, currentY + 4); currentY += 6; charData = window.currentExportData.slice(0, 150).map(row => [ getColumnVal(row, ['código', 'codigo']), String(getColumnVal(row, ['descripción', 'descripcion'])).substring(0, 30), formatMoney(row._costoTotal), formatMoney(row._tarifaVenta2026), row._variacionRelativa.toFixed(1) + '%', row._category ]); } else { charData = [['-', 'Debe visualizar la sección V en la app primero', '-', '-', '-', '-']]; }
-            doc.autoTable({ startY: currentY, head: [['Cód', 'Descripción', 'Costo Tot', 'Tarifa 2026', 'Var %', 'Categoría']], body: charData, theme: 'striped', styles: { fontSize: 7 }, headStyles: { fillColor: [0, 128, 65] }, columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } }, margin: { left: margins.left, right: margins.right } }); currentY = doc.lastAutoTable.finalY + 15;
-
-            // --- SECCIÓN: RESUMEN GERENCIAL CONSOLIDADO ---
-            if (currentY > pageHeight - 100) { doc.addPage(); drawHeader(doc); currentY = margins.top; }
-
-            doc.setFillColor(240, 240, 245);
-            doc.rect(margins.left, currentY - 5, pageWidth - 30, 8, 'F');
-            doc.setTextColor(49, 39, 130);
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(11);
-            doc.text("RESUMEN GERENCIAL DE TARIFAS (CONSOLIDADO)", margins.left + 2, currentY);
-            currentY += 10;
+            doc.text("RESUMEN DE TARIFAS Y MÁRGENES (CONSOLIDADO)", margins.left + 2, currentY); currentY += 8;
 
             const finalizedKeys = Object.keys(window.finalizedAnalysis);
             if (finalizedKeys.length > 0) {
@@ -1437,8 +1572,7 @@
                     return [
                         key,
                         d.items,
-                        // d.increment + " %", // REMOVIDO: Ya no es un incremento único
-                        "Variable", // Indicador de que son múltiples
+                        "Variable", 
                         formatMoney(d.totalCost),
                         formatMoney(d.totalRevenue26),
                         formatMoney(d.margin)
@@ -1475,34 +1609,27 @@
                     }
                 });
                 currentY = doc.lastAutoTable.finalY + 20;
-
             } else {
-                doc.setFont("helvetica", "italic");
-                doc.setFontSize(9);
-                doc.setTextColor(150);
-                doc.text("No se ha guardado configuración individual por libro en la Sección VII.", margins.left, currentY);
-                currentY += 20;
+                 doc.setFont("helvetica", "italic"); doc.setFontSize(9); doc.setTextColor(150);
+                 doc.text("No se ha guardado configuración individual por libro.", margins.left, currentY); currentY += 15;
             }
 
-            // --- SECCIÓN: CONCLUSIONES ---
-            if (currentY > pageHeight - 80) { doc.addPage(); drawHeader(doc); currentY = margins.top; }
-            doc.setFillColor(240, 240, 245); doc.rect(margins.left, currentY - 5, pageWidth - 30, 8, 'F');
+            // SIGNATURES (No Roman Numeral, No Conclusions before it)
+            if (currentY > pageHeight - 50) { doc.addPage(); drawHeader(doc); currentY = margins.top; }
+            doc.setFillColor(240, 240, 245); doc.rect(margins.left, currentY - 5, pageWidth - 30, 7, 'F');
             doc.setTextColor(49, 39, 130); doc.setFont("helvetica", "bold"); doc.setFontSize(11);
-            doc.text("CONCLUSIONES DEL MODELO", margins.left + 2, currentY); currentY += 10;
-            doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(20);
-            const conclusions = [ `1. SOSTENIBILIDAD FINANCIERA: La estructura de costos definida incorpora un margen de recuperación indirecta del ${totalInd}%, distribuido en mano de obra, logística y administración.`, "", `2. EFICIENCIA PARETO Y FLUJO DE CAJA: El análisis evidencia que la gestión de inventarios debe focalizarse estrictamente en los productos Tipo A.`, "", `3. IMPACTO TARIFARIO Y REGULACIÓN: La caracterización de bienes permite discriminar entre productos regulados y de mercado libre.` ];
-            doc.text(conclusions, margins.left, currentY, { maxWidth: pageWidth - 30, align: "justify" }); currentY += 50;
+            doc.text("FIRMAS DE APROBACIÓN", margins.left + 2, currentY); currentY += 20;
 
-            // --- SECCIÓN: FIRMAS (ANTIGUO VI) ---
-            if (currentY > pageHeight - 40) { doc.addPage(); drawHeader(doc); currentY = margins.top; }
-            doc.setFillColor(240, 240, 245); doc.rect(margins.left, currentY - 5, pageWidth - 30, 8, 'F');
-            doc.setTextColor(49, 39, 130); doc.setFont("helvetica", "bold"); doc.setFontSize(11);
-            doc.text("VALIDACIÓN Y FIRMAS", margins.left + 2, currentY); currentY += 15;
-            let sigRow = []; window.signatures.forEach((s) => { sigRow.push(s.role + "\n\n\n__________________________\n" + s.name + "\n" + s.cargo); });
+            // Use the signature array to create a simple layout. User said "solo muestres los nombres".
+            // However, usually signatures need lines. I'll stick to the existing format but simpler header.
+            let sigRow = []; 
+            window.signatures.forEach((s) => { 
+                sigRow.push(s.role + "\n\n\n__________________________\n" + s.name + "\n" + s.cargo); 
+            });
             doc.autoTable({ startY: currentY, head: [], body: [sigRow], theme: 'plain', styles: { halign: 'center', valign: 'bottom', fontSize: 9, cellPadding: 2 }, margin: { left: margins.left } });
 
             const totalPages = doc.internal.getNumberOfPages(); for (let i = 1; i <= totalPages; i++) { doc.setPage(i); drawHeader(doc); drawFooter(doc, i, totalPages); }
-            doc.save(`Informe_Tarifas_Consolidado_${consecutive}.pdf`);
+            doc.save(`Acta_Aprobacion_Tarifas_2026_${consecutive}.pdf`);
         };
         
         window.searchInventory = function() {
