@@ -129,7 +129,7 @@
         
         .bg-cat-black { background-color: #000000; color: white; border: 1px solid #333; }
         .bg-cat-elite { background-color: #4b0082; color: white; border: 1px solid #370061; }
-        .bg-cat-platino { background-color: #e5e4e2; color: #333; border: 1px solid #ccc; }
+        .bg-cat-platino { background-color: #5b5b5b; color: white; border: 1px solid #4a4a4a; } /* Gris oscuro/metálico para Platino */
         .bg-cat-oro { background-color: #ffd700; color: #5c4d00; border: 1px solid #e6c200; }
         .bg-cat-plata { background-color: #c0c0c0; color: #333; border: 1px solid #a6a6a6; }
         .bg-cat-clasicos { background-color: #3b82f6; color: white; border: 1px solid #2563eb; }
@@ -303,10 +303,9 @@
                     <h3 class="flex items-center text-lg font-bold text-slate-800 mb-2"><span class="step-number">3</span> Definición de Tarifas (Sección VII)</h3>
                     <p class="text-sm text-slate-600 ml-2 mb-2">Aquí se gestiona cada libro por separado. Use el gráfico de torta para ver la distribución y la tabla para el detalle.</p>
                      <ul class="list-disc list-inside text-sm text-slate-600 ml-2 space-y-2">
-                        <li><strong>Incrementos por Categoría:</strong> Ajuste el % de incremento para cada grupo (Black, Elite, Clásicos, etc.) de forma independiente.</li>
-                        <li><strong>Filtros Avanzados:</strong> Use los selectores para filtrar por observaciones y por <strong>Categoría</strong> (Black, Elite, etc.).</li>
-                        <li><strong>Ordenamiento:</strong> Haga clic en los encabezados de la tabla para ordenar (ej: <strong>Costo Total</strong> o <strong>Margen</strong>) de mayor a menor.</li>
-                        <li><strong>Gráfica Interactiva:</strong> A la izquierda de cada tabla, verá la distribución por categoría.</li>
+                        <li><strong>Búsqueda Individual:</strong> Use el cuadro de búsqueda en la cabecera de cada tabla para filtrar ítems por nombre o código.</li>
+                        <li><strong>Auto-Categorización:</strong> El sistema asigna automáticamente categorías (Black, Elite, Platino...) según el margen de rentabilidad, excepto para regulados.</li>
+                        <li><strong>Incrementos por Categoría:</strong> Ajuste el % de incremento para cada grupo.</li>
                         <li><strong>Guardar:</strong> Es OBLIGATORIO hacer clic en <strong>"Guardar"</strong> para incluir la configuración en el PDF.</li>
                     </ul>
                 </div>
@@ -426,11 +425,11 @@
             
             <div class="section-separator"></div>
 
-            <!-- SECCIÓN VII: Análisis de Tarifas por Libro (NUEVA - CON GRÁFICOS) -->
+            <!-- SECCIÓN VII: Análisis de Tarifas por Libro (NUEVA - CON GRÁFICOS Y BUSCADOR INDIVIDUAL) -->
             <section id="section-analisis-tarifas" class="bg-slate-50 p-6 rounded-xl shadow-inner border border-slate-300">
                 <div class="mb-6">
                     <h2 class="text-xl font-bold text-slate-800 mb-2">VII. Análisis de Tarifas por Libro (Detallado)</h2>
-                    <p class="text-sm text-slate-600">Defina el incremento individual por categoría y guarde la configuración para el informe final consolidado. <strong class="text-principal">Nota:</strong> La columna "Var %" corresponde a la Rentabilidad sobre Costo (Margen / Costo Total).</p>
+                    <p class="text-sm text-slate-600">Defina el incremento individual por categoría y guarde la configuración para el informe final consolidado. <strong class="text-principal">Nota:</strong> La columna "Var %" corresponde a la Rentabilidad sobre Costo (Margen / Costo Total). <strong>El sistema reclasifica automáticamente la categoría según el margen histórico (excepto regulados).</strong></p>
                 </div>
                 <div id="rate-analysis-container" class="space-y-8"><div class="text-center py-10 text-slate-400"><i class="fas fa-layer-group text-3xl mb-2"></i><p>Cargue un archivo para visualizar las tablas de análisis individual.</p></div></div>
             </section>
@@ -450,10 +449,9 @@
         window.productGroups = [];
         window.currentBaseCost = 0; 
         window.finalizedAnalysis = {}; 
-        // NUEVO: Almacén de instancias de gráficos para Sección VII
         window.sheetCharts = {};
-        // NUEVO: Estado de ordenamiento para cada tabla { safeId: { column: string, direction: 'asc'|'desc' } }
         window.sheetSortState = {};
+        window.sheetSearchQueries = {}; // ALMACÉN DE BÚSQUEDAS INDIVIDUALES
 
         let Logo_HUHMP_Blanco = ""; 
         let currentPieMode = 'count';
@@ -509,9 +507,9 @@
             window.productGroups = [];
             window.currentBaseCost = 0;
             window.finalizedAnalysis = {}; 
-            // Resetear graficos de libros
             window.sheetCharts = {};
-            window.sheetSortState = {}; // Reset sort state
+            window.sheetSortState = {}; 
+            window.sheetSearchQueries = {}; // RESET
             currentCategoryFilter = 'ALL';
             currentParetoFilter = 'ALL';
             
@@ -533,7 +531,6 @@
             window.refreshUI();
         }
 
-        // --- NUEVA LÓGICA DE PRECIOS CENTRALIZADA ---
         window.determinePurchasePrice = function(row, sheetName) {
             if (!sheetName) return 0;
             const getVal = (keywords) => cleanCurrency(getColumnVal(row, keywords));
@@ -544,35 +541,46 @@
             return valPrimary;
         }
 
-        // --- FUNCIONES SECCIÓN VII (NUEVAS + GRÁFICAS + ORDENAMIENTO) ---
-        
-        // Función helper para manejar el clic en el encabezado
+        // --- NUEVA FUNCIÓN DE AUTOCATEGORIZACIÓN POR MARGEN ---
+        window.getAutoCategory = function(marginPercent) {
+            // RANGOS AJUSTADOS SEGÚN SOLICITUD
+            // BLACK: > 5000%
+            // ELITE: 2000% - 4999%
+            // PLATINO: 1000% - 1999%
+            // ORO: 300% - 999%
+            // PLATA: 100% - 299%
+            // CLASICOS: 0.1% - 99%
+            
+            if (marginPercent > 5000) return "BLACK";
+            if (marginPercent >= 2000) return "ELITE";
+            if (marginPercent >= 1000) return "PLATINO";
+            if (marginPercent >= 300) return "ORO";
+            if (marginPercent >= 100) return "PLATA";
+            if (marginPercent >= 0.1) return "CLÁSICOS";
+            return "CLÁSICOS"; // Default fallback
+        }
+
         window.handleSort = function(sheetNameSafe, safeId, column) {
-            // Inicializar si no existe
             if (!window.sheetSortState[safeId]) {
                 window.sheetSortState[safeId] = { column: null, direction: 'desc' };
             }
-            
             const state = window.sheetSortState[safeId];
-            
             if (state.column === column) {
-                // Si ya estaba ordenando por esta columna, invertir dirección
                 state.direction = state.direction === 'desc' ? 'asc' : 'desc';
             } else {
-                // Nueva columna, empezar Descendente (Mayor a Menor) por defecto para números
                 state.column = column;
                 state.direction = 'desc';
             }
-            
-            // Re-renderizar tabla con el nuevo orden
-            // sheetNameSafe puede tener caracteres escapados, pasamos el raw sheet name si es posible o buscamos en sheetsData
-            // En updateSheetTable buscamos por el sheetName original.
-            // Para simplificar, pasamos el sheetName original recuperandolo de productGroups o sheetsData si es complejo,
-            // pero aquí pasamos el string escapado que viene del HTML. Necesitamos "desescapar" o usar el safeId para buscar
-            
-            // Truco: sheetNameSafe viene con quotes escapadas.
             const originalSheetName = Object.keys(window.sheetsData).find(k => k.replace(/[^a-zA-Z0-9]/g, '_') === safeId);
-            
+            if (originalSheetName) {
+                window.updateSheetTable(originalSheetName, safeId);
+            }
+        }
+
+        // --- NUEVA FUNCION PARA BÚSQUEDA INDIVIDUAL ---
+        window.handleSheetSearch = function(sheetNameSafe, safeId, value) {
+            window.sheetSearchQueries[safeId] = value.toLowerCase().trim();
+            const originalSheetName = Object.keys(window.sheetsData).find(k => k.replace(/[^a-zA-Z0-9]/g, '_') === safeId);
             if (originalSheetName) {
                 window.updateSheetTable(originalSheetName, safeId);
             }
@@ -591,9 +599,8 @@
                 const safeId = sheetName.replace(/[^a-zA-Z0-9]/g, '_');
                 const sheetNameSafe = sheetName.replace(/'/g, "\\'");
                 
-                // Generar Inputs para cada categoría
                 const inputsHtml = `
-                    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 mb-4 bg-slate-50 p-2 rounded border border-slate-200">
+                    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2 mb-4 bg-slate-50 p-2 rounded border border-slate-200">
                          <div>
                             <label class="increment-label">Black</label>
                             <input type="number" id="inc-black-${safeId}" value="10" class="table-input text-right" onchange="window.updateSheetTable('${sheetNameSafe}', '${safeId}')">
@@ -601,6 +608,10 @@
                         <div>
                             <label class="increment-label">Elite</label>
                             <input type="number" id="inc-elite-${safeId}" value="10" class="table-input text-right" onchange="window.updateSheetTable('${sheetNameSafe}', '${safeId}')">
+                        </div>
+                        <div>
+                            <label class="increment-label">Platino</label>
+                            <input type="number" id="inc-platino-${safeId}" value="10" class="table-input text-right" onchange="window.updateSheetTable('${sheetNameSafe}', '${safeId}')">
                         </div>
                         <div>
                             <label class="increment-label">Oro</label>
@@ -625,19 +636,28 @@
                     </div>
                 `;
 
-                // --- CAMBIO: AGREGADO SWITCH DE FILTRO POR CATEGORÍA ---
                 const html = `
                     <div class="bg-white p-4 rounded-lg shadow border border-slate-200" id="analysis-block-${safeId}">
                         <div class="flex flex-col sm:flex-row justify-between items-center mb-4 border-b pb-2 gap-4">
                             <h3 class="font-bold text-principal text-lg"><i class="fas fa-book mr-2"></i>${sheetName}</h3>
-                            <div class="flex flex-wrap items-center gap-4 bg-slate-50 p-2 rounded-lg">
+                            <div class="flex flex-wrap items-center gap-4 bg-slate-50 p-2 rounded-lg w-full sm:w-auto">
+                                <!-- BUSCADOR INDIVIDUAL -->
+                                <div class="flex items-center gap-2 border-r border-slate-300 pr-4 mr-2 w-full sm:w-auto">
+                                    <i class="fas fa-search text-slate-400"></i>
+                                    <input type="text" 
+                                           placeholder="Buscar en ${sheetName}..." 
+                                           class="table-input w-full sm:w-48 text-xs" 
+                                           onkeyup="window.handleSheetSearch('${sheetNameSafe}', '${safeId}', this.value)">
+                                </div>
+
                                 <!-- FILTRO CATEGORÍA -->
                                 <div class="flex items-center gap-2 border-r border-slate-300 pr-4 mr-2">
                                     <label class="text-xs font-bold text-slate-600 uppercase"><i class="fas fa-layer-group mr-1"></i>Cat:</label>
-                                    <select id="cat-filter-${safeId}" class="table-input w-32 text-xs font-bold text-principal border-blue-300 focus:border-blue-500" onchange="window.updateSheetTable('${sheetNameSafe}', '${safeId}')">
+                                    <select id="cat-filter-${safeId}" class="table-input w-24 text-xs font-bold text-principal border-blue-300 focus:border-blue-500" onchange="window.updateSheetTable('${sheetNameSafe}', '${safeId}')">
                                         <option value="ALL">TODAS</option>
                                         <option value="BLACK">BLACK</option>
                                         <option value="ELITE">ELITE</option>
+                                        <option value="PLATINO">PLATINO</option>
                                         <option value="ORO">ORO</option>
                                         <option value="PLATA">PLATA</option>
                                         <option value="CLÁSICOS">CLÁSICOS</option>
@@ -647,14 +667,14 @@
                                 </div>
                                 <div class="flex items-center gap-2 border-r border-slate-300 pr-4 mr-2">
                                     <label class="text-xs font-bold text-slate-600 uppercase"><i class="fas fa-filter mr-1"></i>Ver:</label>
-                                    <select id="filter-${safeId}" class="table-input w-36 text-xs font-bold text-principal border-blue-300 focus:border-blue-500" onchange="window.updateSheetTable('${sheetNameSafe}', '${safeId}')">
-                                        <option value="ALL">Ver Todos</option>
-                                        <option value="WITH_OBS">⚠️ Con Observaciones</option>
-                                        <option value="WITHOUT_OBS">✅ Sin Observaciones</option>
+                                    <select id="filter-${safeId}" class="table-input w-28 text-xs font-bold text-principal border-blue-300 focus:border-blue-500" onchange="window.updateSheetTable('${sheetNameSafe}', '${safeId}')">
+                                        <option value="ALL">Todos</option>
+                                        <option value="WITH_OBS">⚠️ Obs</option>
+                                        <option value="WITHOUT_OBS">✅ OK</option>
                                     </select>
                                 </div>
                                 <button onclick="window.saveSheetAnalysis('${sheetNameSafe}', '${safeId}')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow text-xs font-bold flex items-center gap-2 transition-transform active:scale-95"><i class="fas fa-save"></i> Guardar</button>
-                                <button onclick="window.downloadSheetAnalysisExcel('${sheetNameSafe}')" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow text-xs font-bold flex items-center gap-2 transition-transform active:scale-95"><i class="fas fa-file-excel"></i> Descargar Libro</button>
+                                <button onclick="window.downloadSheetAnalysisExcel('${sheetNameSafe}')" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow text-xs font-bold flex items-center gap-2 transition-transform active:scale-95"><i class="fas fa-file-excel"></i></button>
                                 <span id="status-${safeId}" class="text-xs font-bold text-slate-400 italic">Sin guardar</span>
                             </div>
                         </div>
@@ -662,9 +682,7 @@
                         <h4 class="text-xs font-bold text-slate-500 uppercase mb-2">Configurar Incrementos por Categoría (%):</h4>
                         ${inputsHtml}
 
-                        <!-- LAYOUT PARTIDO: 1/3 GRÁFICA | 2/3 TABLA -->
                         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            <!-- COLUMNA IZQUIERDA: GRÁFICA -->
                             <div class="lg:col-span-1 bg-slate-50 p-4 rounded-lg shadow-inner flex flex-col justify-center items-center border border-slate-200">
                                 <h4 class="text-xs font-bold text-slate-500 uppercase mb-4 text-center">Distribución de Categorías (Visible)</h4>
                                 <div class="relative h-64 w-full">
@@ -672,7 +690,6 @@
                                 </div>
                             </div>
 
-                            <!-- COLUMNA DERECHA: TABLA -->
                             <div class="lg:col-span-2 inventory-table-container max-h-[400px]">
                                 <table class="w-full text-xs text-left inventory-table">
                                     <thead class="text-xs uppercase bg-slate-700 text-white sticky top-0 shadow-lg">
@@ -703,9 +720,7 @@
                                             </th>
                                         </tr>
                                     </thead>
-                                    <tbody id="tbody-${safeId}" class="divide-y divide-slate-100">
-                                        <!-- Rows populated by JS -->
-                                    </tbody>
+                                    <tbody id="tbody-${safeId}" class="divide-y divide-slate-100"></tbody>
                                 </table>
                             </div>
                         </div>
@@ -721,10 +736,10 @@
             const rawData = window.sheetsData[sheetName];
             const tbody = document.getElementById(`tbody-${safeId}`);
             
-            // Obtener incrementos individuales
             const increments = {
                 'BLACK': parseFloat(document.getElementById(`inc-black-${safeId}`)?.value) || 0,
                 'ELITE': parseFloat(document.getElementById(`inc-elite-${safeId}`)?.value) || 0,
+                'PLATINO': parseFloat(document.getElementById(`inc-platino-${safeId}`)?.value) || 0,
                 'ORO': parseFloat(document.getElementById(`inc-oro-${safeId}`)?.value) || 0,
                 'PLATA': parseFloat(document.getElementById(`inc-plata-${safeId}`)?.value) || 0,
                 'CLÁSICOS': parseFloat(document.getElementById(`inc-clasicos-${safeId}`)?.value) || 0,
@@ -738,40 +753,58 @@
             const catFilterEl = document.getElementById(`cat-filter-${safeId}`);
             const catFilterVal = catFilterEl ? catFilterEl.value : 'ALL';
 
+            // --- BÚSQUEDA INDIVIDUAL ---
+            const searchQuery = window.sheetSearchQueries[safeId] || '';
+
             const totalIndirect = window.costStructure.reduce((s, i) => s + i.percent, 0);
 
             if (!rawData) { tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-slate-400">Datos no disponibles para este libro.</td></tr>'; return; }
             
+            // Detección robusta de si es regulado
             const isRegulatedSheet = sheetName.toUpperCase().includes('REGULADOS');
 
             const processed = rawData.map(row => {
                 const desc = getColumnVal(row, ['descripción', 'descripcion']);
+                const codigo = getColumnVal(row, ['código', 'codigo']) || '';
                 const valCompra = window.determinePurchasePrice(row, sheetName);
                 const precio2025 = cleanCurrency(getColumnVal(row, ['precio 2025'])); 
                 const precio2026 = cleanCurrency(getColumnVal(row, ['precio 2026', 'tarifa 2026', 'valor 2026', 'proyección 2026', 'venta 2026', 'precio regulado', 'valor regulado', 'tope', 'regulado']));
                 
-                const pareto = (getColumnVal(row, ['pareto', 'páreto']) || 'N/A').toUpperCase().trim();
-                const identA = (getColumnVal(row, ['identificación', 'identificacion', 'a+']) || '').toUpperCase();
-
                 const costosIndirectos = valCompra * (totalIndirect / 100);
                 const costoTotal = valCompra + costosIndirectos;
-                
-                let category = "SIN FRECUENCIA";
-                let badgeClass = "bg-slate-100 text-slate-500";
-                
-                if (pareto === 'A' && identA === 'SI') { category = "BLACK"; badgeClass = "bg-cat-black"; }
-                else if (pareto === 'A') { category = "ELITE"; badgeClass = "bg-cat-elite"; }
-                else if (pareto === 'B') { category = "ORO"; badgeClass = "bg-cat-oro"; }
-                else if (pareto === 'C') { category = "PLATA"; badgeClass = "bg-cat-plata"; }
-                else if (valCompra === 0) { category = "PRODUCTOS SIN FRECUENCIA DE USO"; badgeClass = "bg-cat-sinfreq"; }
-                else { category = "CLÁSICOS"; badgeClass = "bg-cat-clasicos"; }
-                
-                if (isRegulatedSheet || (desc && desc.toLowerCase().includes('regulado'))) { 
-                    category = "REGULADOS"; 
-                    badgeClass = "bg-cat-regulados"; 
+
+                // --- LOGICA DE CATEGORIZACIÓN AUTOMÁTICA ---
+                let category = "CLÁSICOS";
+                let badgeClass = "bg-cat-clasicos";
+                let isRegulatedItem = isRegulatedSheet || (desc && desc.toLowerCase().includes('regulado'));
+
+                // Calcular Margen Histórico para la Categorización
+                // (Precio 2025 - Costo Total) / Costo Total
+                let historicalMarginPercent = 0;
+                if(costoTotal > 0 && precio2025 > 0) {
+                    historicalMarginPercent = ((precio2025 - costoTotal) / costoTotal) * 100;
                 }
 
-                // Obtener incremento específico para esta categoría
+                if (isRegulatedItem) {
+                    category = "REGULADOS";
+                    badgeClass = "bg-cat-regulados";
+                } else if (valCompra === 0) {
+                    category = "PRODUCTOS SIN FRECUENCIA DE USO";
+                    badgeClass = "bg-cat-sinfreq";
+                } else {
+                    // AQUÍ APLICAMOS LA LÓGICA DE LA IMAGEN/ALGORITMO
+                    // Sobrescribimos la categoría original basada en Pareto
+                    category = window.getAutoCategory(historicalMarginPercent);
+                    
+                    // Asignar colores según la nueva categoría
+                    if (category === "BLACK") badgeClass = "bg-cat-black";
+                    else if (category === "ELITE") badgeClass = "bg-cat-elite";
+                    else if (category === "PLATINO") badgeClass = "bg-cat-platino";
+                    else if (category === "ORO") badgeClass = "bg-cat-oro";
+                    else if (category === "PLATA") badgeClass = "bg-cat-plata";
+                    else badgeClass = "bg-cat-clasicos";
+                }
+
                 const specificIncrement = increments[category] || 0;
 
                 let tarifa26 = 0;
@@ -782,26 +815,19 @@
                 }
                 
                 const margen = tarifa26 - costoTotal;
-                
-                // CAMBIO FORMULA: Variación % = (Margen $ / Costo Total) * 100
                 const varRel = costoTotal !== 0 ? (margen / costoTotal) * 100 : 0;
                 
-                // --- NUEVA LÓGICA DE OBSERVACIÓN ---
                 let observacion = '';
-                // Límite superior para alerta de reclasificación (Por defecto 100%, ajustar si la imagen indica otro valor)
                 const UPPER_MARGIN_LIMIT = 100; 
-
-                // Identificar si es ítem regulado para la excepción
-                const isRegulatedItem = category === "REGULADOS";
 
                 if (margen < 0) {
                     observacion = 'Se recomienda validar el ítem';
-                } else if (varRel >= UPPER_MARGIN_LIMIT && !isRegulatedItem) {
-                    observacion = 'Validar item manualmente debido a que se tendría que reclasifica de agrupador';
+                } else if (varRel >= UPPER_MARGIN_LIMIT && category !== "REGULADOS") {
+                    observacion = 'Validar item manualmente (Posible reclasificación)';
                 }
 
                 return {
-                    codigo: getColumnVal(row, ['código', 'codigo']),
+                    codigo: codigo,
                     desc: desc,
                     costoTotal,
                     tarifa26,
@@ -813,68 +839,51 @@
                 };
             });
             
-            // FILTRADO (Ahora filtro por observacion Y por categoría)
+            // FILTRADO (Búsqueda Individual + Filtros)
             let filtered = processed.filter(r => {
                 if (filterVal === 'WITH_OBS' && r.observacion === '') return false; 
                 if (filterVal === 'WITHOUT_OBS' && r.observacion !== '') return false; 
                 if (catFilterVal !== 'ALL' && r.category !== catFilterVal) return false;
+                
+                // Aplicar búsqueda aproximada (include)
+                if (searchQuery) {
+                    const matchCode = String(r.codigo).toLowerCase().includes(searchQuery);
+                    const matchDesc = String(r.desc).toLowerCase().includes(searchQuery);
+                    if (!matchCode && !matchDesc) return false;
+                }
+                
                 return true; 
             });
 
-            // --- LÓGICA DE ORDENAMIENTO ---
+            // LÓGICA DE ORDENAMIENTO
             const sortState = window.sheetSortState[safeId];
             if (sortState && sortState.column) {
                 const col = sortState.column;
                 const dir = sortState.direction === 'asc' ? 1 : -1;
-                
                 filtered.sort((a, b) => {
                     let valA = a[col];
                     let valB = b[col];
-                    
-                    // Manejo de cadenas para sort insensible a mayúsculas
                     if (typeof valA === 'string') valA = valA.toLowerCase();
                     if (typeof valB === 'string') valB = valB.toLowerCase();
-                    
                     if (valA < valB) return -1 * dir;
                     if (valA > valB) return 1 * dir;
                     return 0;
                 });
-
-                // Actualizar iconos visualmente
                 const allIcons = document.querySelectorAll(`[id^="sort-${safeId}-"]`);
-                allIcons.forEach(icon => {
-                    icon.className = "fas fa-sort sort-icon"; // Reset
-                });
-                
+                allIcons.forEach(icon => { icon.className = "fas fa-sort sort-icon"; });
                 const activeIcon = document.getElementById(`sort-${safeId}-${col}`);
                 if (activeIcon) {
-                    // fa-sort-down es usualmente para Descendente (mayor arriba)
-                    // fa-sort-up es usualmente para Ascendente (menor arriba)
-                    // Ajustamos visual:
                     const iconClass = sortState.direction === 'asc' ? 'fa-sort-up' : 'fa-sort-down';
                     activeIcon.className = `fas ${iconClass} sort-icon active`;
                 }
             }
 
-            // --- OBJETO PARA CONTEO DE CATEGORÍAS (GRÁFICA REACTIVA) ---
-            let categoryCounts = {
-                'BLACK': 0, 'ELITE': 0, 'PLATINO': 0, 'ORO': 0, 'PLATA': 0,
-                'CLÁSICOS': 0, 'REGULADOS': 0, 'PRODUCTOS SIN FRECUENCIA DE USO': 0
-            };
-
-            filtered.forEach(r => {
-                 if (categoryCounts.hasOwnProperty(r.category)) {
-                    categoryCounts[r.category]++;
-                } else {
-                    categoryCounts[r.category] = 1;
-                }
-            });
-
-            // --- ACTUALIZAR GRÁFICA DE TORTA DE ESTE LIBRO (CON DATOS FILTRADOS) ---
+            let categoryCounts = { 'BLACK': 0, 'ELITE': 0, 'PLATINO': 0, 'ORO': 0, 'PLATA': 0, 'CLÁSICOS': 0, 'REGULADOS': 0, 'PRODUCTOS SIN FRECUENCIA DE USO': 0 };
+            filtered.forEach(r => { if (categoryCounts.hasOwnProperty(r.category)) { categoryCounts[r.category]++; } else { categoryCounts[r.category] = 1; } });
             window.renderSheetPieChart(safeId, categoryCounts);
 
             if (filtered.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-slate-400">No hay ítems que coincidan con los filtros seleccionados.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-slate-400">No hay ítems que coincidan con los filtros.</td></tr>';
             } else {
                 tbody.innerHTML = filtered.map(r => `
                     <tr class="hover:bg-slate-50">
@@ -889,7 +898,6 @@
                     </tr>
                 `).join('');
             }
-
             const statusEl = document.getElementById(`status-${safeId}`);
             if(statusEl && statusEl.classList.contains('text-green-500')) {
                 statusEl.innerText = "Modificado (Guardar de nuevo)";
@@ -897,45 +905,16 @@
             }
         }
 
-        // --- NUEVA FUNCIÓN PARA RENDERIZAR GRÁFICO POR LIBRO ---
         window.renderSheetPieChart = function(safeId, counts) {
             const ctx = document.getElementById(`chart-${safeId}`);
             if (!ctx) return;
-
-            // Destruir gráfico anterior si existe para evitar superposiciones
-            if (window.sheetCharts[safeId]) {
-                window.sheetCharts[safeId].destroy();
-            }
-
-            // Datos y colores (mismos que Sección V)
+            if (window.sheetCharts[safeId]) { window.sheetCharts[safeId].destroy(); }
             const order = ['BLACK', 'ELITE', 'PLATINO', 'ORO', 'PLATA', 'CLÁSICOS', 'REGULADOS', 'PRODUCTOS SIN FRECUENCIA DE USO'];
             const labels = order.filter(k => counts[k] > 0);
             const data = labels.map(k => counts[k]);
-            const colorMap = {
-                'BLACK': '#000000', 'ELITE': '#4b0082', 'PLATINO': '#e5e4e2',
-                'ORO': '#ffd700', 'PLATA': '#c0c0c0', 'CLÁSICOS': '#3b82f6',
-                'REGULADOS': '#10b981', 'PRODUCTOS SIN FRECUENCIA DE USO': '#ef4444'
-            };
+            const colorMap = { 'BLACK': '#000000', 'ELITE': '#4b0082', 'PLATINO': '#5b5b5b', 'ORO': '#ffd700', 'PLATA': '#c0c0c0', 'CLÁSICOS': '#3b82f6', 'REGULADOS': '#10b981', 'PRODUCTOS SIN FRECUENCIA DE USO': '#ef4444' };
             const colors = labels.map(l => colorMap[l] || '#888');
-
-            window.sheetCharts[safeId] = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        data: data,
-                        backgroundColor: colors,
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } }
-                    }
-                }
-            });
+            window.sheetCharts[safeId] = new Chart(ctx, { type: 'doughnut', data: { labels: labels, datasets: [{ data: data, backgroundColor: colors, borderWidth: 1 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } } } } });
         }
 
         window.downloadSheetAnalysisExcel = function(sheetName) {
@@ -945,10 +924,10 @@
             const safeId = sheetName.replace(/[^a-zA-Z0-9]/g, '_');
             const totalIndirect = window.costStructure.reduce((s, i) => s + i.percent, 0);
             
-            // Recoger incrementos específicos
             const increments = {
                 'BLACK': parseFloat(document.getElementById(`inc-black-${safeId}`)?.value) || 0,
                 'ELITE': parseFloat(document.getElementById(`inc-elite-${safeId}`)?.value) || 0,
+                'PLATINO': parseFloat(document.getElementById(`inc-platino-${safeId}`)?.value) || 0,
                 'ORO': parseFloat(document.getElementById(`inc-oro-${safeId}`)?.value) || 0,
                 'PLATA': parseFloat(document.getElementById(`inc-plata-${safeId}`)?.value) || 0,
                 'CLÁSICOS': parseFloat(document.getElementById(`inc-clasicos-${safeId}`)?.value) || 0,
@@ -960,70 +939,49 @@
 
             const exportArray = rawData.map(row => {
                 const desc = getColumnVal(row, ['descripción', 'descripcion']);
-                
                 const valCompra = window.determinePurchasePrice(row, sheetName);
-                
                 const precio2025 = cleanCurrency(getColumnVal(row, ['precio 2025'])); 
                 const precio2026_file = cleanCurrency(getColumnVal(row, ['precio 2026', 'tarifa 2026', 'valor 2026', 'proyección 2026', 'venta 2026', 'precio regulado', 'valor regulado', 'tope', 'regulado']));
-                const pareto = (getColumnVal(row, ['pareto', 'páreto']) || 'N/A').toUpperCase().trim();
-                const identA = (getColumnVal(row, ['identificación', 'identificacion', 'a+']) || '').toUpperCase();
-
                 const costosIndirectos = valCompra * (totalIndirect / 100);
                 const costoTotal = valCompra + costosIndirectos;
                 
                 let category = "CLÁSICOS";
-                if (pareto === 'A' && identA === 'SI') { category = "BLACK"; }
-                else if (pareto === 'A') { category = "ELITE"; }
-                else if (pareto === 'B') { category = "ORO"; }
-                else if (pareto === 'C') { category = "PLATA"; }
-                else if (valCompra === 0) { category = "PRODUCTOS SIN FRECUENCIA DE USO"; }
+                let isRegulatedItem = isRegulatedSheet || (desc && desc.toLowerCase().includes('regulado'));
+                let historicalMarginPercent = 0;
+                if(costoTotal > 0 && precio2025 > 0) {
+                    historicalMarginPercent = ((precio2025 - costoTotal) / costoTotal) * 100;
+                }
 
-                const isRegulated = isRegulatedSheet || (desc && desc.toLowerCase().includes('regulado'));
-                if (isRegulated) { category = "REGULADOS"; }
+                if (isRegulatedItem) category = "REGULADOS";
+                else if (valCompra === 0) category = "PRODUCTOS SIN FRECUENCIA DE USO";
+                else category = window.getAutoCategory(historicalMarginPercent);
 
                 const specificIncrement = increments[category] || 0;
-
                 let tarifa26 = 0;
-                if (isRegulated) {
+                if (isRegulatedItem) {
                      tarifa26 = (precio2026_file > 0) ? Math.round(precio2026_file) : Math.round(precio2025 * (1 + (specificIncrement / 100)));
                 } else {
                     tarifa26 = Math.round(precio2025 * (1 + (specificIncrement / 100)));
                 }
 
                 const margen = tarifa26 - costoTotal;
-                
-                // CAMBIO FORMULA EXCEL TAMBIÉN: (Margen / Costo Total) * 100
-                // En Excel lo dejamos decimal para formato % (ej: 0.5 = 50%)
                 const varRel = costoTotal !== 0 ? (margen / costoTotal) : 0; 
-                
-                // --- NUEVA LÓGICA DE OBSERVACIÓN ---
                 let observacion = '';
-                // Límite superior (en decimal para Excel, 1.0 = 100%)
                 const UPPER_MARGIN_LIMIT_DECIMAL = 1.0; 
-                
-                // Identificar si es ítem regulado para la excepción
-                const isRegulatedItem = category === "REGULADOS";
-
-                if (margen < 0) {
-                    observacion = 'Se recomienda validar el ítem';
-                } else if (varRel >= UPPER_MARGIN_LIMIT_DECIMAL && !isRegulatedItem) {
-                    observacion = 'Validar item manualmente debido a que se tendría que reclasifica de agrupador';
-                }
+                if (margen < 0) { observacion = 'Se recomienda validar el ítem'; } 
+                else if (varRel >= UPPER_MARGIN_LIMIT_DECIMAL && !isRegulatedItem) { observacion = 'Validar item manualmente (Posible reclasificación)'; }
 
                 const newRow = { ...row };
-                
                 newRow['Costos Indirectos (%)'] = totalIndirect;
                 newRow['Costo Total'] = costoTotal;
                 newRow['Tarifa Venta 2026'] = tarifa26;
                 newRow['Margen Neto ($)'] = margen;
-                newRow['Rentabilidad sobre Costo (Var %)'] = varRel; // Renombrado para claridad en Excel
+                newRow['Rentabilidad sobre Costo (Var %)'] = varRel;
                 newRow['Categoría Final'] = category;
                 newRow['Incremento Aplicado (%)'] = specificIncrement;
                 newRow['Observación de Margen'] = observacion;
-                
                 return newRow;
             });
-
             const ws = XLSX.utils.json_to_sheet(exportArray);
             const wb = XLSX.utils.book_new();
             const sheetNameSafe = sheetName.substring(0, 30);
@@ -1031,12 +989,11 @@
             XLSX.writeFile(wb, `Analisis_Tarifas_${sheetNameSafe}_2026.xlsx`);
         }
 
-
         window.saveSheetAnalysis = function(sheetName, safeId) {
-            // Recoger incrementos específicos
             const increments = {
                 'BLACK': parseFloat(document.getElementById(`inc-black-${safeId}`)?.value) || 0,
                 'ELITE': parseFloat(document.getElementById(`inc-elite-${safeId}`)?.value) || 0,
+                'PLATINO': parseFloat(document.getElementById(`inc-platino-${safeId}`)?.value) || 0,
                 'ORO': parseFloat(document.getElementById(`inc-oro-${safeId}`)?.value) || 0,
                 'PLATA': parseFloat(document.getElementById(`inc-plata-${safeId}`)?.value) || 0,
                 'CLÁSICOS': parseFloat(document.getElementById(`inc-clasicos-${safeId}`)?.value) || 0,
@@ -1046,40 +1003,31 @@
 
             const totalIndirect = window.costStructure.reduce((s, i) => s + i.percent, 0);
             const rawData = window.sheetsData[sheetName];
-            
             const isRegulatedSheet = sheetName.toUpperCase().includes('REGULADOS');
-            
-            let totalCost = 0;
-            let totalRevenue26 = 0;
-            let items = rawData.length;
+            let totalCost = 0; let totalRevenue26 = 0; let items = rawData.length;
 
             rawData.forEach(row => {
                 const valCompra = window.determinePurchasePrice(row, sheetName);
-
                 const precio2025 = cleanCurrency(getColumnVal(row, ['precio 2025'])); 
                 const precio2026 = cleanCurrency(getColumnVal(row, ['precio 2026', 'tarifa 2026', 'valor 2026', 'proyección 2026', 'venta 2026', 'precio regulado', 'valor regulado', 'tope', 'regulado']));
                 const desc = getColumnVal(row, ['descripción', 'descripcion']);
-                
-                const pareto = (getColumnVal(row, ['pareto', 'páreto']) || 'N/A').toUpperCase().trim();
-                const identA = (getColumnVal(row, ['identificación', 'identificacion', 'a+']) || '').toUpperCase();
-
                 const costosIndirectos = valCompra * (totalIndirect / 100);
                 const costoTotal = valCompra + costosIndirectos;
                 
                 let category = "CLÁSICOS";
-                if (pareto === 'A' && identA === 'SI') { category = "BLACK"; }
-                else if (pareto === 'A') { category = "ELITE"; }
-                else if (pareto === 'B') { category = "ORO"; }
-                else if (pareto === 'C') { category = "PLATA"; }
-                else if (valCompra === 0) { category = "PRODUCTOS SIN FRECUENCIA DE USO"; }
-                
-                let isRegulated = isRegulatedSheet || (desc && desc.toLowerCase().includes('regulado'));
-                if (isRegulated) category = "REGULADOS";
+                let isRegulatedItem = isRegulatedSheet || (desc && desc.toLowerCase().includes('regulado'));
+                let historicalMarginPercent = 0;
+                if(costoTotal > 0 && precio2025 > 0) {
+                    historicalMarginPercent = ((precio2025 - costoTotal) / costoTotal) * 100;
+                }
+
+                if (isRegulatedItem) category = "REGULADOS";
+                else if (valCompra === 0) category = "PRODUCTOS SIN FRECUENCIA DE USO";
+                else category = window.getAutoCategory(historicalMarginPercent);
 
                 const specificIncrement = increments[category] || 0;
-
                 let tarifa26 = 0;
-                if (isRegulated) {
+                if (isRegulatedItem) {
                      tarifa26 = (precio2026 > 0) ? Math.round(precio2026) : Math.round(precio2025 * (1 + (specificIncrement / 100)));
                 } else {
                     tarifa26 = Math.round(precio2025 * (1 + (specificIncrement / 100)));
@@ -1089,19 +1037,10 @@
                 totalRevenue26 += tarifa26;
             });
 
-            // Guardar con detalle de incrementos
-            window.finalizedAnalysis[sheetName] = {
-                incrementDetail: increments,
-                items,
-                totalCost,
-                totalRevenue26,
-                margin: totalRevenue26 - totalCost
-            };
-
+            window.finalizedAnalysis[sheetName] = { incrementDetail: increments, items, totalCost, totalRevenue26, margin: totalRevenue26 - totalCost };
             const statusEl = document.getElementById(`status-${safeId}`);
             statusEl.innerHTML = '<i class="fas fa-check"></i> Guardado';
             statusEl.className = "text-xs font-bold text-green-500 italic";
-            
             if(window.saveDataToFirebase) window.saveDataToFirebase();
         }
 
@@ -1316,7 +1255,7 @@
             const labels = order.filter(k => categoryCounts[k] > 0);
             const data = labels.map(k => categoryCounts[k]);
             const colorMap = {
-                'BLACK': '#000000', 'ELITE': '#4b0082', 'PLATINO': '#e5e4e2',
+                'BLACK': '#000000', 'ELITE': '#4b0082', 'PLATINO': '#5b5b5b',
                 'ORO': '#ffd700', 'PLATA': '#c0c0c0', 'CLÁSICOS': '#3b82f6',
                 'REGULADOS': '#10b981', 'PRODUCTOS SIN FRECUENCIA DE USO': '#ef4444'
             };
