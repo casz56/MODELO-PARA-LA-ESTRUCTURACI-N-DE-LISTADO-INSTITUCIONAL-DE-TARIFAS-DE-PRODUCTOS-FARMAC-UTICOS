@@ -476,14 +476,39 @@
             { role: "REVISÓ", name: "María Gómez", cargo: "Coord. Financiera" },
             { role: "APROBÓ", name: "Dr. Carlos Ruiz", cargo: "Gerente General" }
         ];
-        
+
         // --- FUNCIONES AUXILIARES GLOBALES (DEFINIDAS PRIMERO) ---
+        
+        // --- NUEVA LÓGICA DE LIMPIEZA DE MONEDA INTELIGENTE ---
         window.cleanCurrency = function(val) {
-            if (!val) return 0;
+            if (val === null || val === undefined || val === '') return 0;
             if (typeof val === 'number') return val;
-            let str = String(val).replace(/[^0-9.,-]/g, '');
-            if (str.indexOf(',') > str.lastIndexOf('.')) str = str.replace(/\./g, '').replace(',', '.');
-            else if (str.includes(',') && !str.includes('.')) str = str.replace(',', '.');
+            
+            let str = String(val).trim();
+            // Remove currency symbols and spaces, keep numbers, dots, commas, minus
+            str = str.replace(/[^0-9.,-]/g, '');
+            
+            if (!str) return 0;
+
+            // Detect format: Comma as decimal vs Dot as decimal
+            // Rule: If comma appears AFTER the last dot (1.234,56), it's decimal.
+            // If dot appears AFTER the last comma (1,234.56), it's decimal.
+            
+            const lastComma = str.lastIndexOf(',');
+            const lastDot = str.lastIndexOf('.');
+
+            if (lastComma > lastDot) {
+                // Format: 1.234,56 (European/South American)
+                // Remove dots (thousands separator)
+                str = str.replace(/\./g, '');
+                // Replace comma with dot (standard JS float)
+                str = str.replace(',', '.');
+            } else {
+                // Format: 1,234.56 (US/International) or 1234.56
+                // Remove commas (thousands separator)
+                str = str.replace(/,/g, '');
+            }
+
             return parseFloat(str) || 0;
         }
 
@@ -549,65 +574,43 @@
         window.determinePurchasePrice = function(row, sheetName) {
             if (!sheetName) return 0;
             const sheetUpper = sheetName.toUpperCase();
-            
-            // Función interna para buscar en array de posibles columnas
+
+            // Helper to find value by matching header partials
             const findVal = (terms) => {
                 const rowKeys = Object.keys(row);
-                for (const term of terms) {
-                    const foundKey = rowKeys.find(rk => rk.toUpperCase().includes(term.toUpperCase()));
-                    if (foundKey) {
-                        const val = window.cleanCurrency(row[foundKey]);
-                        if (val > 0) return val;
-                    }
+                // Find key that contains ALL terms
+                const foundKey = rowKeys.find(rk => {
+                    const rkUp = rk.toUpperCase();
+                    return terms.every(term => rkUp.includes(term.toUpperCase()));
+                });
+                if (foundKey) {
+                    return window.cleanCurrency(row[foundKey]);
                 }
                 return 0;
-            }
+            };
 
-            // 1. LISTADO GRAL MEDICAMENTOS
-            if (sheetUpper.includes("GRAL") || sheetUpper.includes("GENERAL")) {
-                let v1 = findVal(["VIGENCIA 2025", "23 NOV"]); if (v1 > 0) return v1; // Prioridad 1
-                let v2 = findVal(["VIGENCIA 2024"]); if (v2 > 0) return v2;           // Prioridad 2
-                return findVal(["ULTIMAS", "VALOR MÁXIMO", "VALOR MAXIMO"]);          // Prioridad 3
-            }
+            // ESTRATEGIA SOLICITADA PARA TODOS LOS LIBROS (Incluyendo regulados)
+            // Prioridad 1: COSTO MÁXIMO DE COMPRA VIGENCIA 2025 (CORTE 23 NOV)
+            // Prioridad 2: COSTO MÁXIMO DE COMPRA VIGENCIA 2024
+            // Prioridad 3: VALOR MÁXIMO DE COMPRA (ULTIMAS VIGENCIAS)
 
-            // 2. MEDICAMENTOS REGULADOS (Restricción Circular 019: Solo 2024/2025)
-            if (sheetUpper.includes("MEDICAMENTOS REGULADOS")) {
-                let v1 = findVal(["VIGENCIA 2025", "23 NOV"]); if (v1 > 0) return v1;
-                let v2 = findVal(["VIGENCIA 2024"]); if (v2 > 0) return v2;
-                return 0; // No aplica históricas
-            }
+            // 1. Intentar buscar por 2025 (Corte 23 Nov)
+            let val = findVal(["COSTO", "COMPRA", "2025"]); 
+            if (val > 0) return val;
 
-            // 3. DISPOSITIVOS MEDICOS
-            if (sheetUpper.includes("DISPOSITIVOS")) {
-                let v1 = findVal(["VIGENCIA 2025", "23 NOV"]); if (v1 > 0) return v1;
-                let v2 = findVal(["VIGENCIA 2024"]); if (v2 > 0) return v2;
-                return findVal(["ULTIMAS", "VALOR MÁXIMO", "VALOR MAXIMO"]);
-            }
+            // 2. Intentar buscar por 2024
+            val = findVal(["COSTO", "COMPRA", "2024"]);
+            if (val > 0) return val;
 
-            // 4. STENT REGULADOS (Restricción Regulados: Solo 2024/2025)
-            if (sheetUpper.includes("STENT")) {
-                let v1 = findVal(["VIGENCIA 2025", "23 NOV"]); if (v1 > 0) return v1;
-                let v2 = findVal(["VIGENCIA 2024"]); if (v2 > 0) return v2;
-                // Si es regulado, no aplica históricas antiguas
-                if (sheetUpper.includes("REGULADO")) return 0; 
-                return findVal(["ULTIMAS", "VALOR MÁXIMO"]);
-            }
-
-            // 5. NO FACTURABLES
-            if (sheetUpper.includes("NO FACTURABLE")) {
-                let v1 = findVal(["VIGENCIA 2025", "23 NOV"]); if (v1 > 0) return v1;
-                let v2 = findVal(["VIGENCIA 2024"]); if (v2 > 0) return v2;
-                return findVal(["ULTIMAS", "VALOR MÁXIMO"]);
-            }
+            // 3. Intentar buscar por Ultimas Vigencias (Fallback solicitado)
+            val = findVal(["VALOR", "COMPRA", "ULTIMAS"]);
+            if (val > 0) return val;
             
-            // Fallback Genérico
-            let v1 = findVal(["VIGENCIA 2025", "23 NOV"]); if (v1 > 0) return v1;
-            let v2 = findVal(["VIGENCIA 2024"]); if (v2 > 0) return v2;
-            
-            // Si el nombre contiene REGULADO, aplicamos la restricción por defecto
-            if (sheetUpper.includes("REGULADO")) return 0;
+            // Fallback genérico final (por si las columnas se llaman muy diferente)
+            val = findVal(["2025"]);
+            if (val > 0) return val;
 
-            return findVal(["ULTIMAS", "VALOR MÁXIMO"]);
+            return 0;
         }
 
         // --- AUTOCATEGORIZACIÓN POR MARGEN ---
@@ -847,11 +850,10 @@
                 let badgeClass = "bg-cat-clasicos";
                 let isRegulatedItem = isRegulatedSheet || (desc && desc.toLowerCase().includes('regulado'));
 
-                // Calcular Margen Histórico para la Categorización
-                // (Precio 2025 - Costo Total) / Costo Total
-                let historicalMarginPercent = 0;
-                if(costoTotal > 0 && precio2025 > 0) {
-                    historicalMarginPercent = ((precio2025 - costoTotal) / costoTotal) * 100;
+                // FIX: Usar rawMarginPercent para clasificación
+                let rawMarginPercent = 0;
+                if(valCompra > 0 && precio2025 > 0) {
+                    rawMarginPercent = ((precio2025 - valCompra) / valCompra) * 100;
                 }
 
                 if (isRegulatedItem) {
@@ -862,8 +864,8 @@
                     badgeClass = "bg-cat-sinfreq";
                 } else {
                     // AQUÍ APLICAMOS LA LÓGICA DE LA IMAGEN/ALGORITMO
-                    // Sobrescribimos la categoría original basada en Pareto
-                    category = window.getAutoCategory(historicalMarginPercent);
+                    // Sobrescribimos la categoría original basada en Pareto usando rawMarginPercent
+                    category = window.getAutoCategory(rawMarginPercent);
                     
                     // Asignar colores según la nueva categoría
                     if (category === "BLACK") badgeClass = "bg-cat-black";
@@ -883,6 +885,8 @@
                     tarifa26 = Math.round(precio2025 * (1 + (specificIncrement / 100)));
                 }
                 
+                // Nota: El margen financiero ($) y Var % mostrados en la tabla SI incluyen indirectos
+                // para reflejar la realidad financiera del hospital, aunque la categoría se base en compra pura.
                 const margen = tarifa26 - costoTotal;
                 const varRel = costoTotal !== 0 ? (margen / costoTotal) * 100 : 0;
                 
@@ -1016,14 +1020,16 @@
                 
                 let category = "CLÁSICOS";
                 let isRegulatedItem = isRegulatedSheet || (desc && desc.toLowerCase().includes('regulado'));
-                let historicalMarginPercent = 0;
-                if(costoTotal > 0 && precio2025 > 0) {
-                    historicalMarginPercent = ((precio2025 - costoTotal) / costoTotal) * 100;
+                
+                // FIX: Usar rawMarginPercent para clasificación
+                let rawMarginPercent = 0;
+                if(valCompra > 0 && precio2025 > 0) {
+                    rawMarginPercent = ((precio2025 - valCompra) / valCompra) * 100;
                 }
 
                 if (isRegulatedItem) category = "REGULADOS";
                 else if (valCompra === 0) category = "PRODUCTOS SIN FRECUENCIA DE USO";
-                else category = window.getAutoCategory(historicalMarginPercent);
+                else category = window.getAutoCategory(rawMarginPercent);
 
                 const specificIncrement = increments[category] || 0;
                 let tarifa26 = 0;
@@ -1085,14 +1091,16 @@
                 
                 let category = "CLÁSICOS";
                 let isRegulatedItem = isRegulatedSheet || (desc && desc.toLowerCase().includes('regulado'));
-                let historicalMarginPercent = 0;
-                if(costoTotal > 0 && precio2025 > 0) {
-                    historicalMarginPercent = ((precio2025 - costoTotal) / costoTotal) * 100;
+                
+                // FIX: Usar rawMarginPercent para clasificación
+                let rawMarginPercent = 0;
+                if(valCompra > 0 && precio2025 > 0) {
+                    rawMarginPercent = ((precio2025 - valCompra) / valCompra) * 100;
                 }
 
                 if (isRegulatedItem) category = "REGULADOS";
                 else if (valCompra === 0) category = "PRODUCTOS SIN FRECUENCIA DE USO";
-                else category = window.getAutoCategory(historicalMarginPercent);
+                else category = window.getAutoCategory(rawMarginPercent);
 
                 const specificIncrement = increments[category] || 0;
                 let tarifa26 = 0;
