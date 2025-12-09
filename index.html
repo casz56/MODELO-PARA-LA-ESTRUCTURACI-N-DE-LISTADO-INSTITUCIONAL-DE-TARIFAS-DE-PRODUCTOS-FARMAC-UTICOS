@@ -1480,8 +1480,32 @@
             pieChart = new Chart(ctx2, { type: 'doughnut', data: { labels: [], datasets: [{ data: [], backgroundColor: colors }] }, options: { ...commonOptions, plugins: { legend: { position: 'right' } } } });
         }
 
-        function updateChartsData(l, c) { if(paretoChart) { paretoChart.data.labels = l; paretoChart.data.datasets[0].data = c; paretoChart.update(); } if(pieChart) { pieChart.data.labels = l; pieChart.data.datasets[0].data = c; pieChart.update(); } }
-        
+        function updateChartsData(l, c) {
+            const labels = Array.isArray(l) ? l : [];
+            const counts = Array.isArray(c) ? c : [];
+
+            // Gráfico de barras: trabaja con CONTEOS
+            if (paretoChart) {
+                paretoChart.data.labels = labels;
+                paretoChart.data.datasets[0].data = counts;
+                paretoChart.update();
+            }
+
+            // Cálculo de porcentajes para la dona
+            const total = counts.reduce((sum, v) => sum + (Number(v) || 0), 0);
+            const percentages = counts.map(v => {
+                v = Number(v) || 0;
+                return total > 0 ? (v / total) * 100 : 0;
+            });
+
+            // Gráfico de dona: muestra % de participación
+            if (pieChart) {
+                pieChart.data.labels = labels;
+                pieChart.data.datasets[0].data = percentages;
+                pieChart.update();
+            }
+        }
+
         function formatMoney(n) { return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n); }
         
         window.renderCostStructure = function() {
@@ -1590,66 +1614,13 @@
 
             currentY = doc.lastAutoTable.finalY + 10;
 
-            // SECTION II: ANÁLISIS DE PARETO POR LIBRO (II)
-            if (currentY > pageHeight - 80) { doc.addPage(); drawHeader(doc); currentY = margins.top; }
-            doc.setFillColor(240, 240, 245);
-            doc.rect(margins.left, currentY - 5, pageWidth - 30, 7, 'F');
-            doc.setTextColor(49, 39, 130);
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(11);
-            doc.text("II. ANÁLISIS DE PARETO POR LIBRO", margins.left + 2, currentY);
-            currentY += 7;
-
-            const paretoBody = window.productGroups.map(g => {
-                const sheetName = g.name;
-                const data = window.sheetsData && window.sheetsData[sheetName] ? window.sheetsData[sheetName] : [];
-                let counts = {};
-                if (data.length > 0) {
-                    const keys = Object.keys(data[0]);
-                    const paretoKey = keys.find(k => k.toLowerCase().includes('pareto'));
-                    if (paretoKey) {
-                        data.forEach(row => {
-                            const raw = (row[paretoKey] || '').toString().trim().toUpperCase() || 'N/A';
-                            counts[raw] = (counts[raw] || 0) + 1;
-                        });
-                    }
-                }
-                const total = Object.values(counts).reduce((a,b)=>a+b,0) || 0;
-                let rows = [];
-                if (total > 0) {
-                    // Orden descendente por frecuencia
-                    const ordered = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
-                    let acc = 0;
-                    ordered.forEach(([cat, cnt]) => {
-                        const part = total ? (cnt/total*100) : 0;
-                        acc += part;
-                        rows.push(`${cat}: ${cnt} ítems (${part.toFixed(1)}% / Acum. ${acc.toFixed(1)}%)`);
-                    });
-                } else {
-                    rows.push("Sin clasificación Pareto disponible");
-                }
-                return [sheetName, rows.join('\n')];
-            });
-
-            doc.autoTable({
-                startY: currentY,
-                head: [['Libro', 'Detalle Pareto (frecuencia y % acumulado)']],
-                body: paretoBody,
-                styles: { fontSize: 8, cellPadding: 2 },
-                headStyles: { fillColor: [49, 39, 130], textColor: 255, halign: 'center' },
-                columnStyles: { 0: { halign: 'left', cellWidth: 50 }, 1: { halign: 'left' } },
-                margin: { left: margins.left, right: margins.right }
-            });
-
-            currentY = doc.lastAutoTable.finalY + 15;
-
             // SECTION IV: COSTOS (No Roman Numeral)
             if (currentY > pageHeight - 60) { doc.addPage(); drawHeader(doc); currentY = margins.top; }
             doc.setFillColor(240, 240, 245); doc.rect(margins.left, currentY - 5, pageWidth - 30, 7, 'F');
             doc.setTextColor(49, 39, 130); doc.setFont("helvetica", "bold"); doc.setFontSize(11);
             doc.text("ESTRUCTURA DE COSTOS INDIRECTOS", margins.left + 2, currentY); currentY += 5;
             const costBody = window.costStructure.map(c => [c.name, c.percent + " %"]); costBody.push(['TOTAL RECUPERACIÓN INDIRECTA', totalInd + " %"]);
-            doc.autoTable({ startY: currentY, head: [['Rubro de Costo', 'Porcentaje Asignado']], body: costBody, theme: 'grid', tableWidth: 100, headStyles: { fillColor: [49, 39, 130], textColor: 255 }, didParseCell: function(data) { if (data.row.index === costBody.length - 1) data.cell.styles.fontStyle = 'bold'; }, margin: { left: margins.left } }); currentY = doc.lastAutoTable.finalY + 15;
+            doc.autoTable({ startY: currentY, head: [['Tipo de Costos', 'Porcentaje Asignado']], body: costBody, theme: 'grid', tableWidth: 100, headStyles: { fillColor: [49, 39, 130], textColor: 255 }, didParseCell: function(data) { if (data.row.index === costBody.length - 1) data.cell.styles.fontStyle = 'bold'; }, margin: { left: margins.left } }); currentY = doc.lastAutoTable.finalY + 15;
 
             // SECTION VII: ANÁLISIS DE TARIFAS POR LIBRO (DETALLADO) (VII)
             if (currentY > pageHeight - 80) { doc.addPage(); drawHeader(doc); currentY = margins.top; }
@@ -1726,12 +1697,7 @@
                     return [
                         cat,
                         v.items,
-                        v.inc.toFixed(2) + " %",
-                        formatMoney(v.margen),
-                        margenPct.toFixed(2) + " %",
-                        v.inv,
-                        formatMoney(v.cost),
-                        formatMoney(v.tarifa)
+                        v.inc.toFixed(2) + " %"
                     ];
                 });
 
@@ -1771,19 +1737,14 @@
 
                 doc.autoTable({
                     startY: currentY,
-                    head: [["Caracterización", "Ítems", "% Incremento 2026", "Margen $", "Margen %", "Cant. Inventario", "Costo Total", "Tarifa 2026"]],
+                    head: [["Clasificación", "Número de Ítems", "% de Incremento"]],
                     body: filas,
                     styles: { fontSize: 8 },
                     headStyles: { fillColor: [49, 39, 130], textColor: 255, halign: 'center' },
                     columnStyles: {
                         0: { halign: 'left' },
                         1: { halign: 'right' },
-                        2: { halign: 'right' },
-                        3: { halign: 'right' },
-                        4: { halign: 'right' },
-                        5: { halign: 'right' },
-                        6: { halign: 'right' },
-                        7: { halign: 'right' }
+                        2: { halign: 'right' }
                     },
                     margin: { left: margins.left, right: margins.right }
                 });
