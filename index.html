@@ -393,7 +393,23 @@
 
             <section id="section-costos" class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                 <div class="flex flex-col lg:flex-row justify-between items-center mb-4 border-b pb-2 gap-4"><h2 class="text-xl font-bold text-slate-700">IV. Estructura de Costos Indirectos</h2></div>
-                <div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead class="text-xs text-white uppercase bg-principal"><tr><th class="px-4 py-3 rounded-tl-lg">Rubro</th><th class="px-4 py-3 text-right rounded-tr-lg">Porcentaje (%)</th></tr></thead><tbody id="cost-structure-body" class="divide-y divide-slate-100"></tbody><tfoot class="bg-slate-50 font-bold text-slate-700"><tr><td class="px-4 py-3">TOTAL COSTO INDIRECTO</td><td class="px-4 py-3 text-right text-terciario" id="total-indirect-percent">0.00%</td></tr></tfoot></table></div>
+                    <div class="mt-4 lg:mt-0 lg:ml-auto">
+                        <div class="data-upload-zone p-3 flex items-center gap-3 cursor-pointer group shadow-sm"
+                             onclick="document.getElementById('costos-file-upload').click()">
+                            <div class="bg-principal text-white w-10 h-10 rounded-full flex items-center justify-center group-hover:bg-blue-900 transition-colors">
+                                <i class="fas fa-file-excel"></i>
+                            </div>
+                            <div class="text-left">
+                                <p class="text-sm font-semibold text-slate-800">Cargar Archivo de Costos</p>
+                                <p class="text-xs text-emerald-600" id="cost-upload-status-text">Excel costos indirectos (.xlsx, .xlsm)</p>
+                            </div>
+                            <input type="file" id="costos-file-upload"
+                                   accept=".xlsx,.xls,.xlsm"
+                                   class="hidden"
+                                   onchange="window.handleCostFileUpload(event)">
+                        </div>
+                    </div>
+                <div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead class="text-xs text-white uppercase bg-principal"><tr><th class="px-4 py-3 rounded-tl-lg">Tipo de costo</th><th class="px-4 py-3 text-right rounded-tr-lg">Porcentaje (%)</th></tr></thead><tbody id="cost-structure-body" class="divide-y divide-slate-100"></tbody><tfoot class="bg-slate-50 font-bold text-slate-700"><tr><td class="px-4 py-3">TOTAL COSTO INDIRECTO</td><td class="px-4 py-3 text-right text-terciario" id="total-indirect-percent">0.00%</td></tr></tfoot></table></div>
             </section>
 
             <section id="section-caracterizacion" class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
@@ -466,11 +482,9 @@
 
         // Configuraciones Iniciales
         window.costStructure = [
-            { id: 1, name: "Mano de Obra", percent: 5.0 },
-            { id: 2, name: "Dispensación", percent: 3.0 },
-            { id: 3, name: "Consumo", percent: 2.0 },
-            { id: 4, name: "Logística", percent: 2.0 },
-            { id: 5, name: "Administrativo", percent: 1.5 },
+            { id: 1, name: "Logísticos", percent: 0.0 },
+            { id: 2, name: "Administrativos", percent: 0.0 },
+            { id: 3, name: "Gastos de Legalización", percent: 0.0 },
         ];
         window.signatures = [
             { role: "ELABORÓ", name: "Juan Pérez", cargo: "Q.F. Asistencial" },
@@ -1170,6 +1184,70 @@
             reader.readAsArrayBuffer(file);
         }
 
+        window.handleCostFileUpload = function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheet = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheet];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+                    if (!jsonData || jsonData.length === 0) {
+                        console.warn("Archivo de costos sin datos.");
+                        return;
+                    }
+
+                    const baseStructure = window.costStructure && window.costStructure.length
+                        ? [...window.costStructure]
+                        : [
+                            { id: 1, name: "Logísticos", percent: 0.0 },
+                            { id: 2, name: "Administrativos", percent: 0.0 },
+                            { id: 3, name: "Gastos de Legalización", percent: 0.0 },
+                        ];
+
+                    const parsePercent = (val) => {
+                        if (val === undefined || val === null) return 0;
+                        let s = val.toString().replace('%', '').replace(',', '.');
+                        const num = parseFloat(s);
+                        return isNaN(num) ? 0 : num;
+                    };
+
+                    jsonData.forEach(row => {
+                        const keys = Object.keys(row);
+                        const nameKey = keys.find(k => /tipo/i.test(k) || /costo/i.test(k));
+                        const pctKey = keys.find(k => /porcentaje/i.test(k) || /%/i.test(k));
+
+                        const rawName = (nameKey ? row[nameKey] : "").toString().toLowerCase();
+                        const pct = parsePercent(pctKey ? row[pctKey] : 0);
+
+                        if (!rawName) return;
+
+                        if (rawName.includes("log")) {
+                            baseStructure[0].percent = pct;
+                        } else if (rawName.includes("admin")) {
+                            baseStructure[1].percent = pct;
+                        } else if (rawName.includes("legal")) {
+                            baseStructure[2].percent = pct;
+                        }
+                    });
+
+                    window.costStructure = baseStructure;
+                    if (window.renderCostStructure) window.renderCostStructure();
+                    if (window.saveDataToFirebase) window.saveDataToFirebase();
+                } catch (error) {
+                    console.error("Error al procesar archivo de costos indirectos:", error);
+                    alert("Error al procesar el archivo de costos indirectos. Verifique el formato.");
+                } finally {
+                    event.target.value = "";
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
         function getColumnVal(row, possibleKeys) {
             const rowKeys = Object.keys(row);
             const matchedKey = rowKeys.find(rk => {
@@ -1510,11 +1588,29 @@
         
         window.renderCostStructure = function() {
             const tbody = document.getElementById('cost-structure-body');
+            if (!tbody) return;
+
             let totalPercent = 0;
-            tbody.innerHTML = window.costStructure.map((i, idx) => { totalPercent += i.percent; return `<tr><td class="px-4 py-2 text-slate-700">${i.name}</td><td class="px-4 py-2 text-right"><input type="number" id="cost-input-${idx}" value="${i.percent}" onchange="window.updateCost(${idx}, this.value)" class="table-input w-20 text-right"> %</td></tr>`}).join('');
-            document.getElementById('total-indirect-percent').innerText = totalPercent.toFixed(2) + "%";
+
+            tbody.innerHTML = window.costStructure.map((item) => {
+                const name = item.name || '';
+                const percent = Number(item.percent) || 0;
+                totalPercent += percent;
+
+                return `
+                    <tr class="border-b border-slate-100">
+                        <td class="px-4 py-3">${name}</td>
+                        <td class="px-4 py-3 text-right">${percent.toFixed(2)} %</td>
+                    </tr>
+                `;
+            }).join('');
+
+            const totalCell = document.getElementById('total-indirect-percent');
+            if (totalCell) {
+                totalCell.innerText = totalPercent.toFixed(2) + "%";
+            }
         }
-        
+
         window.updateCost = (i,v) => { window.costStructure[i].percent = parseFloat(v)||0; window.renderCostStructure(); const currentBook = document.getElementById('char-book-select').value; if(currentBook) window.renderCharacterizationTable(currentBook); if(window.saveDataToFirebase) window.saveDataToFirebase(); };
         
         window.renderSignatures = function() { document.getElementById('signatures-body').innerHTML = window.signatures.map((s, idx) => `<tr><td class="p-2"><input id="sig-role-${idx}" value="${s.role}" onchange="window.upSig(${idx},'role',this.value)" class="table-input"></td><td class="p-2"><input id="sig-name-${idx}" value="${s.name}" onchange="window.upSig(${idx},'name',this.value)" class="table-input"></td><td class="p-2"><input id="sig-cargo-${idx}" value="${s.cargo}" onchange="window.upSig(${idx},'cargo',this.value)" class="table-input"></td><td class="p-2 text-center"><button onclick="window.rmSig(${idx})" class="text-red-500"><i class="fas fa-trash"></i></button></td></tr>`).join(''); }
@@ -1619,7 +1715,7 @@
             doc.setFillColor(240, 240, 245); doc.rect(margins.left, currentY - 5, pageWidth - 30, 7, 'F');
             doc.setTextColor(49, 39, 130); doc.setFont("helvetica", "bold"); doc.setFontSize(11);
             doc.text("ESTRUCTURA DE COSTOS INDIRECTOS", margins.left + 2, currentY); currentY += 5;
-            const costBody = window.costStructure.map(c => [c.name, c.percent + " %"]); costBody.push(['TOTAL RECUPERACIÓN INDIRECTA', totalInd + " %"]);
+            const costBody = window.costStructure.map(c => [c.name, c.percent + " %"]); costBody.push(['TOTAL', totalInd + " %"]);
             doc.autoTable({ startY: currentY, head: [['Tipo de Costos', 'Porcentaje Asignado']], body: costBody, theme: 'grid', tableWidth: 100, headStyles: { fillColor: [49, 39, 130], textColor: 255 }, didParseCell: function(data) { if (data.row.index === costBody.length - 1) data.cell.styles.fontStyle = 'bold'; }, margin: { left: margins.left } }); currentY = doc.lastAutoTable.finalY + 15;
 
             // SECTION VII: ANÁLISIS DE TARIFAS POR LIBRO (DETALLADO) (VII)
