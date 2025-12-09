@@ -476,6 +476,20 @@
             { role: "REVISÓ", name: "María Gómez", cargo: "Coord. Financiera" },
             { role: "APROBÓ", name: "Dr. Carlos Ruiz", cargo: "Gerente General" }
         ];
+        
+        // --- FUNCIONES AUXILIARES GLOBALES (DEFINIDAS PRIMERO) ---
+        window.cleanCurrency = function(val) {
+            if (!val) return 0;
+            if (typeof val === 'number') return val;
+            let str = String(val).replace(/[^0-9.,-]/g, '');
+            if (str.indexOf(',') > str.lastIndexOf('.')) str = str.replace(/\./g, '').replace(',', '.');
+            else if (str.includes(',') && !str.includes('.')) str = str.replace(',', '.');
+            return parseFloat(str) || 0;
+        }
+
+        window.formatMoney = function(n) { 
+            return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n); 
+        }
 
         window.onload = () => {
             window.initLogo();
@@ -531,19 +545,74 @@
             window.refreshUI();
         }
 
+        // --- LÓGICA DE PRECIOS POR LIBRO ---
         window.determinePurchasePrice = function(row, sheetName) {
             if (!sheetName) return 0;
-            const getVal = (keywords) => cleanCurrency(getColumnVal(row, keywords));
-            const termMaxUltimas = ['valor máximo de compra', 'valor maximo de compra', 'ultimas vigencias'];
-            const termCosto2025 = ['costo máximo de compra', 'costo maximo de compra', 'vigencia 2025', 'corte 23 nov'];
-            let valPrimary = getVal(termMaxUltimas);
-            if (valPrimary <= 0) { return getVal(termCosto2025); }
-            return valPrimary;
+            const sheetUpper = sheetName.toUpperCase();
+            
+            // Función interna para buscar en array de posibles columnas
+            const findVal = (terms) => {
+                const rowKeys = Object.keys(row);
+                for (const term of terms) {
+                    const foundKey = rowKeys.find(rk => rk.toUpperCase().includes(term.toUpperCase()));
+                    if (foundKey) {
+                        const val = window.cleanCurrency(row[foundKey]);
+                        if (val > 0) return val;
+                    }
+                }
+                return 0;
+            }
+
+            // 1. LISTADO GRAL MEDICAMENTOS
+            if (sheetUpper.includes("GRAL") || sheetUpper.includes("GENERAL")) {
+                let v1 = findVal(["VIGENCIA 2025", "23 NOV"]); if (v1 > 0) return v1; // Prioridad 1
+                let v2 = findVal(["VIGENCIA 2024"]); if (v2 > 0) return v2;           // Prioridad 2
+                return findVal(["ULTIMAS", "VALOR MÁXIMO", "VALOR MAXIMO"]);          // Prioridad 3
+            }
+
+            // 2. MEDICAMENTOS REGULADOS (Restricción Circular 019: Solo 2024/2025)
+            if (sheetUpper.includes("MEDICAMENTOS REGULADOS")) {
+                let v1 = findVal(["VIGENCIA 2025", "23 NOV"]); if (v1 > 0) return v1;
+                let v2 = findVal(["VIGENCIA 2024"]); if (v2 > 0) return v2;
+                return 0; // No aplica históricas
+            }
+
+            // 3. DISPOSITIVOS MEDICOS
+            if (sheetUpper.includes("DISPOSITIVOS")) {
+                let v1 = findVal(["VIGENCIA 2025", "23 NOV"]); if (v1 > 0) return v1;
+                let v2 = findVal(["VIGENCIA 2024"]); if (v2 > 0) return v2;
+                return findVal(["ULTIMAS", "VALOR MÁXIMO", "VALOR MAXIMO"]);
+            }
+
+            // 4. STENT REGULADOS (Restricción Regulados: Solo 2024/2025)
+            if (sheetUpper.includes("STENT")) {
+                let v1 = findVal(["VIGENCIA 2025", "23 NOV"]); if (v1 > 0) return v1;
+                let v2 = findVal(["VIGENCIA 2024"]); if (v2 > 0) return v2;
+                // Si es regulado, no aplica históricas antiguas
+                if (sheetUpper.includes("REGULADO")) return 0; 
+                return findVal(["ULTIMAS", "VALOR MÁXIMO"]);
+            }
+
+            // 5. NO FACTURABLES
+            if (sheetUpper.includes("NO FACTURABLE")) {
+                let v1 = findVal(["VIGENCIA 2025", "23 NOV"]); if (v1 > 0) return v1;
+                let v2 = findVal(["VIGENCIA 2024"]); if (v2 > 0) return v2;
+                return findVal(["ULTIMAS", "VALOR MÁXIMO"]);
+            }
+            
+            // Fallback Genérico
+            let v1 = findVal(["VIGENCIA 2025", "23 NOV"]); if (v1 > 0) return v1;
+            let v2 = findVal(["VIGENCIA 2024"]); if (v2 > 0) return v2;
+            
+            // Si el nombre contiene REGULADO, aplicamos la restricción por defecto
+            if (sheetUpper.includes("REGULADO")) return 0;
+
+            return findVal(["ULTIMAS", "VALOR MÁXIMO"]);
         }
 
-        // --- NUEVA FUNCIÓN DE AUTOCATEGORIZACIÓN POR MARGEN ---
+        // --- AUTOCATEGORIZACIÓN POR MARGEN ---
         window.getAutoCategory = function(marginPercent) {
-            // RANGOS AJUSTADOS SEGÚN SOLICITUD
+            // RANGOS:
             // BLACK: > 5000%
             // ELITE: 2000% - 4999%
             // PLATINO: 1000% - 1999%
@@ -767,8 +836,8 @@
                 const desc = getColumnVal(row, ['descripción', 'descripcion']);
                 const codigo = getColumnVal(row, ['código', 'codigo']) || '';
                 const valCompra = window.determinePurchasePrice(row, sheetName);
-                const precio2025 = cleanCurrency(getColumnVal(row, ['precio 2025'])); 
-                const precio2026 = cleanCurrency(getColumnVal(row, ['precio 2026', 'tarifa 2026', 'valor 2026', 'proyección 2026', 'venta 2026', 'precio regulado', 'valor regulado', 'tope', 'regulado']));
+                const precio2025 = window.cleanCurrency(getColumnVal(row, ['precio 2025'])); 
+                const precio2026 = window.cleanCurrency(getColumnVal(row, ['precio 2026', 'tarifa 2026', 'valor 2026', 'proyección 2026', 'venta 2026', 'precio regulado', 'valor regulado', 'tope', 'regulado']));
                 
                 const costosIndirectos = valCompra * (totalIndirect / 100);
                 const costoTotal = valCompra + costosIndirectos;
@@ -889,9 +958,9 @@
                     <tr class="hover:bg-slate-50">
                         <td class="px-4 py-2 font-mono text-slate-600">${r.codigo || '-'}</td>
                         <td class="px-4 py-2 truncate max-w-xs" title="${r.desc}">${String(r.desc).substring(0,40)}</td>
-                        <td class="px-4 py-2 text-right">${formatMoney(r.costoTotal)}</td>
-                        <td class="px-4 py-2 text-right font-bold text-blue-800">${formatMoney(r.tarifa26)}</td>
-                        <td class="px-4 py-2 text-right font-bold ${r.margen >= 0 ? 'text-green-600' : 'text-red-600'} bg-slate-50 border-l border-slate-200">${formatMoney(r.margen)}</td>
+                        <td class="px-4 py-2 text-right">${window.formatMoney(r.costoTotal)}</td>
+                        <td class="px-4 py-2 text-right font-bold text-blue-800">${window.formatMoney(r.tarifa26)}</td>
+                        <td class="px-4 py-2 text-right font-bold ${r.margen >= 0 ? 'text-green-600' : 'text-red-600'} bg-slate-50 border-l border-slate-200">${window.formatMoney(r.margen)}</td>
                         <td class="px-4 py-2 text-right ${r.varRel >= 0 ? 'text-green-600' : 'text-red-600'} text-[10px]">${r.varRel.toFixed(1)}%</td>
                         <td class="px-4 py-2 text-xs text-center ${r.margen < 0 ? 'bg-red-100 text-red-700 font-bold' : (r.observacion.includes('Validar item') ? 'bg-yellow-100 text-yellow-700 font-bold' : 'text-slate-500')}">${r.observacion}</td>
                         <td class="px-4 py-2 text-center"><span class="px-2 py-0.5 rounded text-[10px] ${r.badgeClass}">${r.category}</span></td>
@@ -940,8 +1009,8 @@
             const exportArray = rawData.map(row => {
                 const desc = getColumnVal(row, ['descripción', 'descripcion']);
                 const valCompra = window.determinePurchasePrice(row, sheetName);
-                const precio2025 = cleanCurrency(getColumnVal(row, ['precio 2025'])); 
-                const precio2026_file = cleanCurrency(getColumnVal(row, ['precio 2026', 'tarifa 2026', 'valor 2026', 'proyección 2026', 'venta 2026', 'precio regulado', 'valor regulado', 'tope', 'regulado']));
+                const precio2025 = window.cleanCurrency(getColumnVal(row, ['precio 2025'])); 
+                const precio2026_file = window.cleanCurrency(getColumnVal(row, ['precio 2026', 'tarifa 2026', 'valor 2026', 'proyección 2026', 'venta 2026', 'precio regulado', 'valor regulado', 'tope', 'regulado']));
                 const costosIndirectos = valCompra * (totalIndirect / 100);
                 const costoTotal = valCompra + costosIndirectos;
                 
@@ -1008,8 +1077,8 @@
 
             rawData.forEach(row => {
                 const valCompra = window.determinePurchasePrice(row, sheetName);
-                const precio2025 = cleanCurrency(getColumnVal(row, ['precio 2025'])); 
-                const precio2026 = cleanCurrency(getColumnVal(row, ['precio 2026', 'tarifa 2026', 'valor 2026', 'proyección 2026', 'venta 2026', 'precio regulado', 'valor regulado', 'tope', 'regulado']));
+                const precio2025 = window.cleanCurrency(getColumnVal(row, ['precio 2025'])); 
+                const precio2026 = window.cleanCurrency(getColumnVal(row, ['precio 2026', 'tarifa 2026', 'valor 2026', 'proyección 2026', 'venta 2026', 'precio regulado', 'valor regulado', 'tope', 'regulado']));
                 const desc = getColumnVal(row, ['descripción', 'descripcion']);
                 const costosIndirectos = valCompra * (totalIndirect / 100);
                 const costoTotal = valCompra + costosIndirectos;
@@ -1145,7 +1214,7 @@
                 const codigo = getColumnVal(row, ['código', 'codigo', 'producto']);
                 const desc = getColumnVal(row, ['descripción', 'descripcion']);
                 const pres = getColumnVal(row, ['presentación', 'presentacion']);
-                const precio = cleanCurrency(getColumnVal(row, ['precio 2025']));
+                const precio = window.cleanCurrency(getColumnVal(row, ['precio 2025']));
                 const unidades = parseFloat(getColumnVal(row, ['unidades', 'n° unidades'])) || 0;
                 const valCompra = window.determinePurchasePrice(row, sheetName);
                 const estado = getColumnVal(row, ['estado']);
@@ -1158,9 +1227,9 @@
                         <td class="px-4 py-2 font-mono text-xs text-slate-600">${codigo || '-'}</td>
                         <td class="px-4 py-2 truncate max-w-xs" title="${desc}">${desc || '-'}</td>
                         <td class="px-4 py-2">${pres || '-'}</td>
-                        <td class="px-4 py-2 text-right font-medium">${formatMoney(precio)}</td>
+                        <td class="px-4 py-2 text-right font-medium">${window.formatMoney(precio)}</td>
                         <td class="px-4 py-2 text-right">${unidades}</td>
-                        <td class="px-4 py-2 text-right text-xs text-slate-500">${formatMoney(valCompra)}</td>
+                        <td class="px-4 py-2 text-right text-xs text-slate-500">${window.formatMoney(valCompra)}</td>
                         <td class="px-4 py-2"><span class="px-2 py-0.5 rounded-full bg-slate-100 text-[10px]">${estado || 'N/A'}</span></td>
                         <td class="px-4 py-2 text-xs italic text-slate-500 truncate max-w-[100px]" title="${obs}">${obs || ''}</td>
                         <td class="px-4 py-2 text-xs">${hom || ''}</td>
@@ -1201,8 +1270,8 @@
             const processed = rawData.map(row => {
                 const desc = getColumnVal(row, ['descripción', 'descripcion']);
                 const valCompra = window.determinePurchasePrice(row, sheetName);
-                const precio2025 = cleanCurrency(getColumnVal(row, ['precio 2025'])); 
-                const precio2026 = cleanCurrency(getColumnVal(row, ['precio 2026', 'tarifa 2026', 'valor 2026', 'proyección 2026', 'venta 2026', 'precio regulado', 'valor regulado', 'tope', 'regulado']));
+                const precio2025 = window.cleanCurrency(getColumnVal(row, ['precio 2025'])); 
+                const precio2026 = window.cleanCurrency(getColumnVal(row, ['precio 2026', 'tarifa 2026', 'valor 2026', 'proyección 2026', 'venta 2026', 'precio regulado', 'valor regulado', 'tope', 'regulado']));
                 
                 const pareto = (getColumnVal(row, ['pareto', 'páreto']) || 'N/A').toUpperCase().trim();
                 const identA = (getColumnVal(row, ['identificación', 'identificacion', 'a+']) || '').toUpperCase();
@@ -1308,8 +1377,8 @@
                     <tr class="hover:bg-slate-50 border-b border-slate-100">
                         <td class="px-4 py-2 font-mono text-xs text-slate-600">${r.codigo || '-'}</td>
                         <td class="px-4 py-2 truncate max-w-xs" title="${r.desc}">${String(r.desc).substring(0,40)}</td>
-                        <td class="px-4 py-2 text-right">${formatMoney(r._costoTotal)}</td>
-                        <td class="px-4 py-2 text-right font-bold text-blue-800">${formatMoney(r._tarifaVenta2026)}</td>
+                        <td class="px-4 py-2 text-right">${window.formatMoney(r._costoTotal)}</td>
+                        <td class="px-4 py-2 text-right font-bold text-blue-800">${window.formatMoney(r._tarifaVenta2026)}</td>
                         <td class="px-4 py-2 text-right text-green-600 text-[10px]">${r._variacionRelativa.toFixed(1)}%</td>
                         <td class="px-4 py-2 text-center"><span class="px-2 py-0.5 rounded text-[10px] ${r.badgeClass}">${r._category}</span></td>
                     </tr>
@@ -1347,7 +1416,7 @@
             const paretoKey = keys.find(k => k.toLowerCase().includes('pareto'));
             let paretoCounts = {};
             data.forEach(row => {
-                const p = cleanCurrency(row[priceKey]);
+                const p = window.cleanCurrency(row[priceKey]);
                 const u = parseFloat(row[unitsKey]) || 0;
                 totalCost += (p * u);
                 if(paretoKey) { const cat = (row[paretoKey] || 'N/A').toString().trim().toUpperCase(); paretoCounts[cat] = (paretoCounts[cat] || 0) + 1; }
@@ -1355,15 +1424,6 @@
             let topPareto = 'N/A'; let maxCount = 0;
             Object.entries(paretoCounts).forEach(([k, v]) => { if(v > maxCount && k!=='N/A') { maxCount = v; topPareto = k; } });
             return { totalCost, totalRevenue: totalCost * 1.3, topPareto };
-        }
-
-        function cleanCurrency(val) {
-            if (!val) return 0;
-            if (typeof val === 'number') return val;
-            let str = String(val).replace(/[^0-9.,-]/g, '');
-            if (str.indexOf(',') > str.lastIndexOf('.')) str = str.replace(/\./g, '').replace(',', '.');
-            else if (str.includes(',') && !str.includes('.')) str = str.replace(',', '.');
-            return parseFloat(str) || 0;
         }
 
         window.onSuccessUpload = function(count) { const status = document.getElementById('upload-status-text'); status.innerText = `${count} libros cargados`; status.className = "text-xs text-green-600 font-bold"; }
@@ -1389,10 +1449,10 @@
             const variation = group.revenue - group.cost;
             document.getElementById('detail-title').innerText = group.name;
             document.getElementById('detail-items-badge').innerText = `${group.count} Ítems`;
-            document.getElementById('detail-cost').innerText = formatMoney(group.cost);
-            document.getElementById('detail-revenue').innerText = formatMoney(group.revenue);
+            document.getElementById('detail-cost').innerText = window.formatMoney(group.cost);
+            document.getElementById('detail-revenue').innerText = window.formatMoney(group.revenue);
             const varElement = document.getElementById('detail-variation');
-            varElement.innerText = formatMoney(variation);
+            varElement.innerText = window.formatMoney(variation);
             if(variation >= 0) varElement.className = "text-xl font-bold text-green-600"; else varElement.className = "text-xl font-bold text-red-600";
             document.getElementById('inventory-book-select').value = group.name;
             window.renderInventoryTable(group.name);
@@ -1419,8 +1479,6 @@
         }
 
         function updateChartsData(l, c) { if(paretoChart) { paretoChart.data.labels = l; paretoChart.data.datasets[0].data = c; paretoChart.update(); } if(pieChart) { pieChart.data.labels = l; pieChart.data.datasets[0].data = c; pieChart.update(); } }
-        
-        function formatMoney(n) { return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n); }
         
         window.renderCostStructure = function() {
             const tbody = document.getElementById('cost-structure-body');
@@ -1486,7 +1544,7 @@
             doc.setFillColor(240, 240, 245); doc.rect(margins.left, currentY - 5, pageWidth - 30, 7, 'F');
             doc.setTextColor(49, 39, 130); doc.setFont("helvetica", "bold"); doc.setFontSize(11);
             doc.text("RESUMEN DE PRODUCTOS POR TIPO", margins.left + 2, currentY); currentY += 5;
-            const summaryBody = window.productGroups.map(g => [ g.name, g.count, formatMoney(g.cost), formatMoney(g.revenue) ]);
+            const summaryBody = window.productGroups.map(g => [ g.name, g.count, window.formatMoney(g.cost), window.formatMoney(g.revenue) ]);
             doc.autoTable({ startY: currentY, head: [['Libro / Fuente', 'Cant. Ítems', 'Costo Total Inventario', 'Venta Proyectada']], body: summaryBody, theme: 'striped', headStyles: { fillColor: [49, 39, 130], textColor: 255, fontSize: 8 }, bodyStyles: { fontSize: 8 }, columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' } }, margin: { left: margins.left, right: margins.right } });
             currentY = doc.lastAutoTable.finalY + 15;
 
@@ -1512,9 +1570,9 @@
                         key,
                         d.items,
                         "Variable", 
-                        formatMoney(d.totalCost),
-                        formatMoney(d.totalRevenue26),
-                        formatMoney(d.margin)
+                        window.formatMoney(d.totalCost),
+                        window.formatMoney(d.totalRevenue26),
+                        window.formatMoney(d.margin)
                     ];
                 });
 
@@ -1524,9 +1582,9 @@
                     'TOTAL CONSOLIDADO', 
                     '', 
                     '', 
-                    formatMoney(grandTotalCost), 
-                    formatMoney(grandTotalRev), 
-                    formatMoney(grandTotalRev - grandTotalCost)
+                    window.formatMoney(grandTotalCost), 
+                    window.formatMoney(grandTotalRev), 
+                    window.formatMoney(grandTotalRev - grandTotalCost)
                 ]);
 
                 doc.autoTable({
@@ -1559,8 +1617,6 @@
             doc.setTextColor(49, 39, 130); doc.setFont("helvetica", "bold"); doc.setFontSize(11);
             doc.text("FIRMAS DE APROBACIÓN", margins.left + 2, currentY); currentY += 20;
 
-            // Use the signature array to create a simple layout. User said "solo muestres los nombres".
-            // However, usually signatures need lines. I'll stick to the existing format but simpler header.
             let sigRow = []; 
             window.signatures.forEach((s) => { 
                 sigRow.push(s.role + "\n\n\n__________________________\n" + s.name + "\n" + s.cargo); 
