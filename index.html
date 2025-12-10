@@ -1726,10 +1726,20 @@ window.updateCost = (i,v) => { window.costStructure[i].percent = parseFloat(v)||
             };
 
             const drawFooter = (doc, pageNum, pageCount) => {
-                doc.setDrawColor(200); doc.line(10, pageHeight - 15, pageWidth - 10, pageHeight - 15);
-                doc.setFontSize(7); doc.setTextColor(100); doc.text(`Generado: ${currentDate}`, 15, pageHeight - 10);
-                doc.text(`Página ${pageNum} de ${pageCount}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
-                doc.text(`Consecutivo: ${consecutive}`, pageWidth - 15, pageHeight - 10, { align: 'right' });
+    // Línea superior del pie de página
+    doc.setDrawColor(200);
+    doc.line(10, pageHeight - 15, pageWidth - 10, pageHeight - 15);
+
+    // Texto de fecha de generación (izquierda)
+    doc.setFontSize(7);
+    doc.setTextColor(100);
+    doc.text(`Generado: ${currentDate}`, 15, pageHeight - 10);
+
+    // Número de página en la esquina inferior derecha
+    doc.text(`Página ${pageNum} de ${pageCount}`, pageWidth - 15, pageHeight - 10, { align: 'right' });
+
+
+
             };
 
             let currentY = margins.top;
