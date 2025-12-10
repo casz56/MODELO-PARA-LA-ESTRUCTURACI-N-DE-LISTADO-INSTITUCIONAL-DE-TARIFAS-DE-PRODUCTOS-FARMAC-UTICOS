@@ -1713,10 +1713,16 @@ window.updateCost = (i,v) => { window.costStructure[i].percent = parseFloat(v)||
                     } catch (e) {}
                 }
                 doc.setTextColor(255, 255, 255);
-                doc.setFont("helvetica", "bold"); doc.setFontSize(14); 
-                // Changed title to Acta
-                doc.text("ACTA DE APROBACIÓN DE TARIFAS DE MEDICAMENTOS Y DISPOSITIVOS MÉDICOS VIGENCIA 2026", 40, 12);
-                doc.setFontSize(9); doc.setFont("helvetica", "normal"); doc.text("ESE Hospital Universitario Hernando Moncaleano Perdomo", 40, 18); doc.text("Código: GD-SGI-M-005 | Versión: 01", 40, 23);
+                doc.setFont("helvetica", "bold"); 
+                // Título centrado y ubicado por debajo del logo para evitar superposición
+                const mainTitle = "ACTA DE APROBACIÓN DE TARIFAS DE MEDICAMENTOS Y DISPOSITIVOS MÉDICOS VIGENCIA 2026";
+                doc.setFontSize(8);
+                doc.text(mainTitle, pageWidth / 2, 18, { align: 'center', maxWidth: pageWidth - 40 });
+
+                doc.setFontSize(7); 
+                doc.setFont("helvetica", "normal"); 
+                doc.text("ESE Hospital Universitario Hernando Moncaleano Perdomo", pageWidth / 2, 22, { align: 'center' }); 
+                doc.text("Código: GD-SGI-M-005 | Versión: 01", pageWidth / 2, 26, { align: 'center' });
             };
 
             const drawFooter = (doc, pageNum, pageCount) => {
