@@ -849,7 +849,10 @@
                                                 <div class="flex items-center justify-center gap-2">Observación <i id="sort-${safeId}-observacion" class="fas fa-sort sort-icon"></i></div>
                                             </th>
                                             <th class="px-4 py-2 text-center sortable-header" onclick="window.handleSort('${sheetNameSafe}', '${safeId}', 'category')">
-                                                <div class="flex items-center justify-center gap-2">Categoría <i id="sort-${safeId}-category" class="fas fa-sort sort-icon"></i></div>
+                                                <div class="flex items-center justify-center gap-2">Categoría Inicial <i id="sort-${safeId}-category" class="fas fa-sort sort-icon"></i></div>
+                                            </th>
+                                            <th class="px-4 py-2 text-center bg-indigo-900 border-l border-indigo-700 sortable-header" onclick="window.handleSort('${sheetNameSafe}', '${safeId}', 'categoryFinal')">
+                                                <div class="flex items-center justify-center gap-2">Categoría Final <i id="sort-${safeId}-categoryFinal" class="fas fa-sort sort-icon"></i></div>
                                             </th>
                                         </tr>
                                     </thead>
@@ -891,7 +894,7 @@
 
             const totalIndirect = window.costStructure.reduce((s, i) => s + i.percent, 0);
 
-            if (!rawData) { tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-slate-400">Datos no disponibles para este libro.</td></tr>'; return; }
+            if (!rawData) { tbody.innerHTML = '<tr><td colspan="9" class="px-4 py-8 text-center text-slate-400">Datos no disponibles para este libro.</td></tr>'; return; }
             
             // Detección robusta de si es regulado
             const isRegulatedSheet = sheetName.toUpperCase().includes('REGULADOS');
@@ -959,6 +962,27 @@
                     observacion = 'Validar item manualmente (Posible reclasificación)';
                 }
 
+                // --- CATEGORÍA FINAL (POST-INCREMENTO, SEGÚN MARGEN FINAL %) ---
+                // varRel ya está en porcentaje: (Margen/CostoTotal)*100
+                let categoryFinal = category;
+                let badgeClassFinal = badgeClass;
+
+                if (isRegulatedItem) {
+                    categoryFinal = "REGULADOS";
+                    badgeClassFinal = "bg-cat-regulados";
+                } else if (valCompra === 0) {
+                    categoryFinal = "PRODUCTOS SIN FRECUENCIA DE USO";
+                    badgeClassFinal = "bg-cat-sinfreq";
+                } else {
+                    categoryFinal = window.getAutoCategory(varRel);
+                    if (categoryFinal === "BLACK") badgeClassFinal = "bg-cat-black";
+                    else if (categoryFinal === "ELITE") badgeClassFinal = "bg-cat-elite";
+                    else if (categoryFinal === "PLATINO") badgeClassFinal = "bg-cat-platino";
+                    else if (categoryFinal === "ORO") badgeClassFinal = "bg-cat-oro";
+                    else if (categoryFinal === "PLATA") badgeClassFinal = "bg-cat-plata";
+                    else badgeClassFinal = "bg-cat-clasicos";
+                }
+
                 return {
                     codigo: codigo,
                     desc: desc,
@@ -967,7 +991,9 @@
                     margen,
                     varRel,
                     category,
+                    categoryFinal,
                     badgeClass,
+                    badgeClassFinal,
                     observacion
                 };
             });
@@ -1012,11 +1038,11 @@
             }
 
             let categoryCounts = { 'BLACK': 0, 'ELITE': 0, 'PLATINO': 0, 'ORO': 0, 'PLATA': 0, 'CLÁSICOS': 0, 'REGULADOS': 0, 'PRODUCTOS SIN FRECUENCIA DE USO': 0 };
-            filtered.forEach(r => { if (categoryCounts.hasOwnProperty(r.category)) { categoryCounts[r.category]++; } else { categoryCounts[r.category] = 1; } });
+            filtered.forEach(r => { const k = r.categoryFinal || r.category; if (categoryCounts.hasOwnProperty(k)) { categoryCounts[k]++; } else { categoryCounts[k] = 1; } });
             window.renderSheetPieChart(safeId, categoryCounts);
 
             if (filtered.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-slate-400">No hay ítems que coincidan con los filtros.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="9" class="px-4 py-8 text-center text-slate-400">No hay ítems que coincidan con los filtros.</td></tr>';
             } else {
                 tbody.innerHTML = filtered.map(r => `
                     <tr class="hover:bg-slate-50">
@@ -1028,6 +1054,7 @@
                         <td class="px-4 py-2 text-right ${r.varRel >= 0 ? 'text-green-600' : 'text-red-600'} text-[10px]">${r.varRel.toFixed(1)}%</td>
                         <td class="px-4 py-2 text-xs text-center ${r.margen < 0 ? 'bg-red-100 text-red-700 font-bold' : (r.observacion.includes('Validar item') ? 'bg-yellow-100 text-yellow-700 font-bold' : 'text-slate-500')}">${r.observacion}</td>
                         <td class="px-4 py-2 text-center"><span class="px-2 py-0.5 rounded text-[10px] ${r.badgeClass}">${r.category}</span></td>
+                        <td class="px-4 py-2 text-center bg-slate-50 border-l border-slate-200"><span class="px-2 py-0.5 rounded text-[10px] ${r.badgeClassFinal}">${r.categoryFinal}</span></td>
                     </tr>
                 `).join('');
             }
@@ -1051,12 +1078,15 @@
         }
 
         window.downloadSheetAnalysisExcel = function(sheetName) {
-            const rawData = window.sheetsData[sheetName];
+            const rawData = window.sheetsData?.[sheetName];
             if (!rawData) { alert(`No hay datos cargados para el libro: ${sheetName}`); return; }
+            if (typeof XLSX === 'undefined' || !XLSX.utils) { alert("No se encontró la librería XLSX (SheetJS)."); return; }
 
             const safeId = sheetName.replace(/[^a-zA-Z0-9]/g, '_');
-            const totalIndirect = window.costStructure.reduce((s, i) => s + i.percent, 0);
-            
+
+            // Total de costos indirectos (tolerante a que no se haya cargado la estructura de costos)
+            const totalIndirect = (window.costStructure || []).reduce((s, i) => s + (Number(i.percent) || 0), 0);
+
             const increments = {
                 'BLACK': parseFloat(document.getElementById(`inc-black-${safeId}`)?.value) || 0,
                 'ELITE': parseFloat(document.getElementById(`inc-elite-${safeId}`)?.value) || 0,
@@ -1073,15 +1103,16 @@
             const exportArray = rawData.map(row => {
                 const desc = getColumnVal(row, ['descripción', 'descripcion']);
                 const valCompra = window.determinePurchasePrice(row, sheetName);
-                const precio2025 = cleanCurrency(getColumnVal(row, ['precio 2025'])); 
+                const precio2025 = cleanCurrency(getColumnVal(row, ['precio 2025']));
                 const precio2026_file = cleanCurrency(getColumnVal(row, ['precio 2026', 'tarifa 2026', 'valor 2026', 'proyección 2026', 'venta 2026', 'precio regulado', 'valor regulado', 'tope', 'regulado']));
                 const costosIndirectos = totalIndirect > 0 ? valCompra * (totalIndirect / 100) : 0;
                 const costoTotal = valCompra + costosIndirectos;
-                
+
+                // Categoría Inicial (según margen histórico)
                 let category = "CLÁSICOS";
-                let isRegulatedItem = isRegulatedSheet || (desc && desc.toLowerCase().includes('regulado'));
+                const isRegulatedItem = isRegulatedSheet || (desc && desc.toLowerCase().includes('regulado'));
                 let historicalMarginPercent = 0;
-                if(costoTotal > 0 && precio2025 > 0) {
+                if (costoTotal > 0 && precio2025 > 0) {
                     historicalMarginPercent = ((precio2025 - costoTotal) / costoTotal) * 100;
                 }
 
@@ -1090,19 +1121,29 @@
                 else category = window.getAutoCategory(historicalMarginPercent);
 
                 const specificIncrement = increments[category] || 0;
+
+                // Tarifa 2026
                 let tarifa26 = 0;
                 if (isRegulatedItem) {
-                     tarifa26 = (precio2026_file > 0) ? Math.round(precio2026_file) : Math.round(precio2025 * (1 + (specificIncrement / 100)));
+                    tarifa26 = (precio2026_file > 0) ? Math.round(precio2026_file) : Math.round(precio2025 * (1 + (specificIncrement / 100)));
                 } else {
                     tarifa26 = Math.round(precio2025 * (1 + (specificIncrement / 100)));
                 }
 
                 const margen = tarifa26 - costoTotal;
-                const varRel = costoTotal !== 0 ? (margen / costoTotal) : 0; 
+                const varRel = costoTotal !== 0 ? (margen / costoTotal) : 0;
+
+                // Categoría final (según margen final)
+                const finalMarginPercent = costoTotal !== 0 ? (margen / costoTotal) * 100 : 0;
+                let categoryFinal = category;
+                if (!isRegulatedItem && valCompra !== 0) {
+                    categoryFinal = window.getAutoCategory(finalMarginPercent);
+                }
+
                 let observacion = '';
-                const UPPER_MARGIN_LIMIT_DECIMAL = 1.0; 
-                if (margen < 0) { observacion = 'Se recomienda validar el ítem'; } 
-                else if (varRel >= UPPER_MARGIN_LIMIT_DECIMAL && !isRegulatedItem) { observacion = 'Validar item manualmente (Posible reclasificación)'; }
+                const UPPER_MARGIN_LIMIT_DECIMAL = 1.0;
+                if (margen < 0) observacion = 'Se recomienda validar el ítem';
+                else if (varRel >= UPPER_MARGIN_LIMIT_DECIMAL && !isRegulatedItem) observacion = 'Validar item manualmente (Posible reclasificación)';
 
                 const newRow = { ...row };
                 newRow['Costos Indirectos (%)'] = totalIndirect;
@@ -1110,16 +1151,33 @@
                 newRow['Tarifa Venta 2026'] = tarifa26;
                 newRow['Margen Neto ($)'] = margen;
                 newRow['Rentabilidad sobre Costo (Var %)'] = varRel;
-                newRow['Categoría Final'] = category;
+                newRow['Categoría Inicial'] = category;
+                newRow['Categoría Final'] = categoryFinal;
                 newRow['Incremento Aplicado (%)'] = specificIncrement;
                 newRow['Observación de Margen'] = observacion;
                 return newRow;
             });
+
             const ws = XLSX.utils.json_to_sheet(exportArray);
             const wb = XLSX.utils.book_new();
-            const sheetNameSafe = sheetName.substring(0, 30);
-            XLSX.utils.book_append_sheet(wb, ws, sheetNameSafe);
-            XLSX.writeFile(wb, `Analisis_Tarifas_${sheetNameSafe}_2026.xlsx`);
+
+            // Nombre de hoja Excel: sin caracteres inválidos y máximo 31
+            const excelSheetName = String(sheetName)
+                .replace(/[\\\/\?\*\[\]\:]/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim()
+                .substring(0, 31) || "Analisis_2026";
+
+            XLSX.utils.book_append_sheet(wb, ws, excelSheetName);
+
+            // Nombre de archivo (Windows-safe)
+            const fileSafe = String(sheetName)
+                .replace(/[\\\/\?\*\[\]\:]/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim()
+                .substring(0, 60) || "Libro";
+
+            XLSX.writeFile(wb, `Analisis_Tarifas_${fileSafe}_2026.xlsx`);
         }
 
         window.saveSheetAnalysis = function(sheetName, safeId) {
