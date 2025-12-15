@@ -676,21 +676,25 @@
 
         // --- NUEVA FUNCIÓN DE AUTOCATEGORIZACIÓN POR MARGEN ---
         window.getAutoCategory = function(marginPercent) {
-            // RANGOS AJUSTADOS SEGÚN SOLICITUD
-            // BLACK: > 5000%
-            // ELITE: 2000% - 4999%
-            // PLATINO: 1000% - 1999%
-            // ORO: 300% - 999%
-            // PLATA: 100% - 299%
-            // CLASICOS: 0.1% - 99%
-            
-            if (marginPercent > 5000) return "BLACK";
-            if (marginPercent >= 2000) return "ELITE";
-            if (marginPercent >= 1000) return "PLATINO";
-            if (marginPercent >= 300) return "ORO";
-            if (marginPercent >= 100) return "PLATA";
-            if (marginPercent >= 0.1) return "CLÁSICOS";
-            return "CLÁSICOS"; // Default fallback
+            // RANGOS SEGÚN IMAGEN (margen en %)
+            // BLACK:  >= 5000%
+            // ELITE:  2000% a 4999.999...
+            // PLATINO:1000% a 1999.999...
+            // ORO:    300%  a 999.999...
+            // PLATA:  100%  a 299.999...
+            // CLÁSICOS:0.1% a 99.999...
+            // (Cualquier valor menor a 0.1% o negativo queda como CLÁSICOS)
+
+            const m = Number(marginPercent);
+            if (!isFinite(m)) return "CLÁSICOS";
+
+            if (m >= 5000) return "BLACK";
+            if (m >= 2000 && m < 5000) return "ELITE";
+            if (m >= 1000 && m < 2000) return "PLATINO";
+            if (m >= 300 && m < 1000) return "ORO";
+            if (m >= 100 && m < 300) return "PLATA";
+            if (m >= 0.1 && m < 100) return "CLÁSICOS";
+            return "CLÁSICOS";
         }
 
         window.handleSort = function(sheetNameSafe, safeId, column) {
@@ -911,25 +915,51 @@
                 let badgeClass = "bg-cat-clasicos";
                 let isRegulatedItem = isRegulatedSheet || (desc && desc.toLowerCase().includes('regulado'));
 
-                // Calcular Margen Histórico para la Categorización
-                // (Precio 2025 - Costo Total) / Costo Total
+                // Margen histórico base (sobre costo total 2025)
                 let historicalMarginPercent = 0;
-                if(costoTotal > 0 && precio2025 > 0) {
+                if (costoTotal > 0 && precio2025 > 0) {
                     historicalMarginPercent = ((precio2025 - costoTotal) / costoTotal) * 100;
                 }
+
+                // Resultados finales (tarifa 2026 / margen / varRel) para devolver
+                let tarifa26 = 0;
+                let margen = 0;
+                let varRel = 0;
 
                 if (isRegulatedItem) {
                     category = "REGULADOS";
                     badgeClass = "bg-cat-regulados";
+                    const specificIncrement = increments[category] || 0;
+                    tarifa26 = (precio2026 > 0) ? Math.round(precio2026) : Math.round(precio2025 * (1 + (specificIncrement / 100)));
+                    margen = tarifa26 - costoTotal;
+                    varRel = costoTotal !== 0 ? (margen / costoTotal) * 100 : 0;
                 } else if (valCompra === 0) {
                     category = "PRODUCTOS SIN FRECUENCIA DE USO";
                     badgeClass = "bg-cat-sinfreq";
+                    const specificIncrement = increments[category] || 0;
+                    tarifa26 = Math.round(precio2025 * (1 + (specificIncrement / 100)));
+                    margen = tarifa26 - costoTotal;
+                    varRel = costoTotal !== 0 ? (margen / costoTotal) * 100 : 0;
                 } else {
-                    // AQUÍ APLICAMOS LA LÓGICA DE LA IMAGEN/ALGORITMO
-                    // Sobrescribimos la categoría original basada en Pareto
-                    category = window.getAutoCategory(historicalMarginPercent);
-                    
-                    // Asignar colores según la nueva categoría
+                    // 1) Categoría inicial por margen histórico
+                    let tempCategory = window.getAutoCategory(historicalMarginPercent);
+
+                    // 2) Re-categorización por margen FINAL (después de costos totales + incremento propuesto)
+                    //    Iteramos hasta estabilizar la categoría (máx 3 vueltas para evitar ciclos).
+                    for (let iter = 0; iter < 3; iter++) {
+                        const inc = increments[tempCategory] || 0;
+                        tarifa26 = Math.round(precio2025 * (1 + (inc / 100)));
+                        margen = tarifa26 - costoTotal;
+                        varRel = costoTotal !== 0 ? (margen / costoTotal) * 100 : 0;
+
+                        const newCategory = window.getAutoCategory(varRel);
+                        if (newCategory === tempCategory) break;
+                        tempCategory = newCategory;
+                    }
+
+                    category = tempCategory;
+
+                    // Asignar colores según la categoría final
                     if (category === "BLACK") badgeClass = "bg-cat-black";
                     else if (category === "ELITE") badgeClass = "bg-cat-elite";
                     else if (category === "PLATINO") badgeClass = "bg-cat-platino";
@@ -938,20 +968,8 @@
                     else badgeClass = "bg-cat-clasicos";
                 }
 
-                const specificIncrement = increments[category] || 0;
-
-                let tarifa26 = 0;
-                if (category === "REGULADOS") {
-                    tarifa26 = (precio2026 > 0) ? Math.round(precio2026) : Math.round(precio2025 * (1 + (specificIncrement / 100)));
-                } else {
-                    tarifa26 = Math.round(precio2025 * (1 + (specificIncrement / 100)));
-                }
-                
-                const margen = tarifa26 - costoTotal;
-                const varRel = costoTotal !== 0 ? (margen / costoTotal) * 100 : 0;
-                
                 let observacion = '';
-                const UPPER_MARGIN_LIMIT = 100; 
+                const UPPER_MARGIN_LIMIT = 100;
 
                 if (margen < 0) {
                     observacion = 'Se recomienda validar el ítem';
@@ -1087,7 +1105,20 @@
 
                 if (isRegulatedItem) category = "REGULADOS";
                 else if (valCompra === 0) category = "PRODUCTOS SIN FRECUENCIA DE USO";
-                else category = window.getAutoCategory(historicalMarginPercent);
+                else {
+                    // Categoría final basada en el margen después de costos totales + incremento propuesto
+                    let tempCategory = window.getAutoCategory(historicalMarginPercent);
+                    for (let iter = 0; iter < 3; iter++) {
+                        const inc = increments[tempCategory] || 0;
+                        const tarifaTmp = Math.round(precio2025 * (1 + (inc / 100)));
+                        const margenTmp = tarifaTmp - costoTotal;
+                        const varRelTmp = costoTotal !== 0 ? (margenTmp / costoTotal) * 100 : 0;
+                        const newCat = window.getAutoCategory(varRelTmp);
+                        if (newCat === tempCategory) break;
+                        tempCategory = newCat;
+                    }
+                    category = tempCategory;
+                }
 
                 const specificIncrement = increments[category] || 0;
                 let tarifa26 = 0;
@@ -1156,7 +1187,20 @@
 
                 if (isRegulatedItem) category = "REGULADOS";
                 else if (valCompra === 0) category = "PRODUCTOS SIN FRECUENCIA DE USO";
-                else category = window.getAutoCategory(historicalMarginPercent);
+                else {
+                    // Categoría final basada en el margen después de costos totales + incremento propuesto
+                    let tempCategory = window.getAutoCategory(historicalMarginPercent);
+                    for (let iter = 0; iter < 3; iter++) {
+                        const inc = increments[tempCategory] || 0;
+                        const tarifaTmp = Math.round(precio2025 * (1 + (inc / 100)));
+                        const margenTmp = tarifaTmp - costoTotal;
+                        const varRelTmp = costoTotal !== 0 ? (margenTmp / costoTotal) * 100 : 0;
+                        const newCat = window.getAutoCategory(varRelTmp);
+                        if (newCat === tempCategory) break;
+                        tempCategory = newCat;
+                    }
+                    category = tempCategory;
+                }
 
                 const specificIncrement = increments[category] || 0;
                 let tarifa26 = 0;
@@ -1915,10 +1959,23 @@ window.updateCost = (i,v) => { window.costStructure[i].percent = parseFloat(v)||
 
                     let category = "CLÁSICOS";
                     if (isRegulatedItem) category = "REGULADOS";
-                    else if (valCompra === 0) category = "PRODUCTOS SIN FRECUENCIA DE USO";
-                    else category = window.getAutoCategory(historicalMarginPercent);
+                else if (valCompra === 0) category = "PRODUCTOS SIN FRECUENCIA DE USO";
+                else {
+                    // Categoría final basada en el margen después de costos totales + incremento propuesto
+                    let tempCategory = window.getAutoCategory(historicalMarginPercent);
+                    for (let iter = 0; iter < 3; iter++) {
+                        const inc = increments[tempCategory] || 0;
+                        const tarifaTmp = Math.round(precio2025 * (1 + (inc / 100)));
+                        const margenTmp = tarifaTmp - costoTotal;
+                        const varRelTmp = costoTotal !== 0 ? (margenTmp / costoTotal) * 100 : 0;
+                        const newCat = window.getAutoCategory(varRelTmp);
+                        if (newCat === tempCategory) break;
+                        tempCategory = newCat;
+                    }
+                    category = tempCategory;
+                }
 
-                    const specificIncrement = increments[category] || 0;
+                const specificIncrement = increments[category] || 0;
 
                     let tarifa26 = 0;
                     if (isRegulatedItem) {
