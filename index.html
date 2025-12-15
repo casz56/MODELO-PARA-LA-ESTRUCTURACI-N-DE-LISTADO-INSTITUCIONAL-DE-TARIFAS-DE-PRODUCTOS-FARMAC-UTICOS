@@ -690,9 +690,9 @@
 
             if (m >= 5000) return "BLACK";
             if (m >= 2000 && m < 5000) return "ELITE";
-            if (m >= 1000 && m < 2000) return "PLATINO";
-            if (m >= 300 && m < 1000) return "ORO";
-            if (m >= 100 && m < 300) return "PLATA";
+            if (m >= 1000 && m < 1999) return "PLATINO";
+            if (m >= 300 && m < 999) return "ORO";
+            if (m >= 100 && m < 299) return "PLATA";
             if (m >= 0.1 && m < 100) return "CLÁSICOS";
             return "CLÁSICOS";
         }
@@ -969,7 +969,7 @@
                 }
 
                 let observacion = '';
-                const UPPER_MARGIN_LIMIT = 100;
+                const UPPER_MARGIN_LIMIT = 150;
 
                 if (margen < 0) {
                     observacion = 'Se recomienda validar el ítem';
